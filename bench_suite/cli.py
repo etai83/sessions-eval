@@ -10,7 +10,7 @@ from pathlib import Path
 from bench_suite.live import run_live_task
 from bench_suite.offline import run_offline_golden_path
 from bench_suite.runner import AlreadyEvaluatedError
-from bench_suite.pipeline import transcript_to_candidate
+from bench_suite.pipeline import transcript_to_candidate, sample_and_write_pending, promote_task
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -54,6 +54,41 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to classifier_rules.json (default: .scratch/bench-suite/classifier_rules.json)",
     )
+
+    sample = sub.add_parser(
+        "sample",
+        help="Stratified-sample a pool of transcripts into pending-review (no API)",
+    )
+    sample.add_argument(
+        "transcripts",
+        nargs="+",
+        type=Path,
+        help="Paths to transcript_full.jsonl files",
+    )
+    sample.add_argument("--repo-root", type=Path, default=None)
+    sample.add_argument(
+        "--rules",
+        type=Path,
+        default=None,
+        help="Path to classifier_rules.json",
+    )
+    sample.add_argument(
+        "--target",
+        type=int,
+        default=20,
+        help="Target total tasks (default: 20)",
+    )
+
+    promote = sub.add_parser(
+        "promote",
+        help="Promote a human-reviewed pending-review JSON into dataset/tasks/",
+    )
+    promote.add_argument(
+        "pending_file",
+        type=Path,
+        help="Path to candidate_<conv-id>.json in pending-review/",
+    )
+    promote.add_argument("--repo-root", type=Path, default=None)
 
     args = parser.parse_args(argv)
 
@@ -105,6 +140,45 @@ def main(argv: list[str] | None = None) -> int:
             f"tools={len(candidate['tool_invocations'])}",
             file=sys.stderr,
         )
+        return 0
+
+    if args.command == "sample":
+        root = args.repo_root or Path.cwd()
+        from bench_suite.config import load_config
+        config = load_config(repo_root=root)
+        paths = config["_resolved_paths"]
+        from bench_suite.store import DatasetStore
+        store = DatasetStore(
+            Path(paths["dataset_tasks"]),
+            Path(paths["schema"]),
+        )
+        existing_ids = {t["source"]["conversation_id"] for t in store.list_tasks()}
+        result = sample_and_write_pending(
+            args.transcripts,
+            rules_path=args.rules,
+            pending_dir=paths["pending_review"],
+            existing_ids=existing_ids,
+            target_total=args.target,
+            repo_root=root,
+        )
+        print(json.dumps(result, indent=2))
+        print(
+            f"\nSampled: ingested={result['candidates_ingested']} "
+            f"selected={result['candidates_selected']} "
+            f"written={len(result['paths_written'])} "
+            f"pending-review={paths['pending_review']}",
+            file=sys.stderr,
+        )
+        return 0
+
+    if args.command == "promote":
+        try:
+            result = promote_task(args.pending_file, repo_root=args.repo_root)
+        except FileExistsError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(json.dumps(result, indent=2))
+        print(f"\nPromoted: task_id={result['task_id']} → {result['dataset_path']}", file=sys.stderr)
         return 0
 
     parser.error(f"Unknown command: {args.command}")
