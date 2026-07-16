@@ -100,7 +100,7 @@
 | Property | Value |
 |---|---|
 | **Input** | `transcript_full.jsonl` path |
-| **Output** | `TaskCandidate`: `{conversation_id, timestamp, user_request, tool_invocations[], duration_seconds}` |
+| **Output** | `TaskCandidate`: `{conversation_id, timestamp, user_request, tool_invocations[], duration_seconds, transcript_path}` |
 | **Logic** | Filter `source=USER_EXPLICIT, type=USER_INPUT` → strip `<USER_REQUEST>` XML; pair PLANNER_RESPONSE tool_calls with result steps |
 | **Storage** | Transient (in-memory); not persisted |
 | **Owns** | Extraction algorithm from ticket 01 |

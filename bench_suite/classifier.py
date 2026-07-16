@@ -38,6 +38,8 @@ class Classifier:
             "subcategory": self.defaults.get("subcategory", "Miscellaneous"),
         }
 
+        # Rules are evaluated in order; last matching rule wins (later rules are more specific).
+        # Ordering in classifier_rules.json is intentional — general rules first, specific last.
         for rule in self.rules:
             patterns = rule.get("match") or []
             if not any(str(p).lower() in text for p in patterns):
