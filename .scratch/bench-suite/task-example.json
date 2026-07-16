@@ -1,0 +1,76 @@
+{
+  "task_id": "data_audio_transcription_01",
+  "name": "Morning Walk Audio Transcription and Obsidian Daily Note Creation",
+
+  "taxonomy": {
+    "output_type": "plan_or_spec",
+    "complexity": "multi_tool",
+    "intent": "generate"
+  },
+
+  "domain": {
+    "category": "Data Engineering",
+    "subcategory": "Audio Processing"
+  },
+
+  "source": {
+    "conversation_id": "d315da50-63ae-418d-a449-fea46d406104",
+    "transcript_path": "~/.gemini/antigravity/brain/d315da50-63ae-418d-a449-fea46d406104/.system_generated/logs/transcript_full.jsonl",
+    "timestamp": "2026-07-02T06:02:08Z"
+  },
+
+  "prompt": "Connect to my Google Drive and transcribe the m4a file named \"morning walk <with the current date>\". Only if you found one, continue to the next steps, otherwise return a message to the user \"No file was found\".\nUse /browser to overcome and approve my user authentication.\nClose the opened port that is running \"./dev.sh\" command after finishing the transcription.\nRun /obsidian-markdown skill to create a new daily out of the transcription.",
+
+  "required_tools": ["browser_subagent", "run_command", "write_to_file", "view_file"],
+  "required_skills": ["transcribe", "obsidian-markdown"],
+
+  "roi_value": 60.0,
+  "target_token_budget": 15000,
+  "target_tool_call_budget": 20,
+
+  "setup_steps": [
+    {
+      "action": "write_file",
+      "path": "sandbox/audio_config.json",
+      "content": "{\"audio_source\": \"Morning walk 02072026.m4a\"}"
+    }
+  ],
+
+  "validation_rules": [
+    {
+      "type": "file_exists",
+      "path": "/Users/itaiharpaz/Code/second_brain/Daily/2026-07-02.md"
+    },
+    {
+      "type": "file_contains",
+      "path": "/Users/itaiharpaz/Code/second_brain/Daily/2026-07-02.md",
+      "text": "# 📅 2026-07-02"
+    },
+    {
+      "type": "file_contains",
+      "path": "/Users/itaiharpaz/Code/second_brain/Daily/2026-07-02.md",
+      "text": "## ☀️ Morning Standup"
+    },
+    {
+      "type": "llm_judge",
+      "rubric": "The daily note contains a coherent summary of the walk content from the transcription. It is not empty and is not a generic template with unfilled placeholders.",
+      "min_score": 0.7
+    }
+  ],
+
+  "evaluation_results": [
+    {
+      "model_name": "gemini-2.5-flash",
+      "model_config": { "thinking_level": "high" },
+      "completeness_percent": 100.0,
+      "input_tokens": 12200,
+      "output_tokens": 2240,
+      "tool_calls": 67,
+      "cost_usd": 0.2836,
+      "latency_seconds": 184.0,
+      "earned_roi": 60.0,
+      "cost_effectiveness_roi_per_usd": 211.56,
+      "timestamp": "2026-07-02T09:03:00+03:00"
+    }
+  ]
+}

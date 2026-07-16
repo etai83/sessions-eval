@@ -1,0 +1,192 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TaskEntry",
+  "description": "A single benchmark task entry for the Antigravity evaluation suite.",
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Unique identifier: <slug>_<NN>"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable task name"
+    },
+
+    "taxonomy": {
+      "type": "object",
+      "description": "Three-axis classification (decided in ticket 02)",
+      "properties": {
+        "output_type": {
+          "type": "string",
+          "enum": ["code", "plan_or_spec"],
+          "description": "Primary classification: what the task produces"
+        },
+        "complexity": {
+          "type": "string",
+          "enum": ["single_step", "multi_tool", "multi_agent"],
+          "description": "Secondary classification: agent orchestration depth"
+        },
+        "intent": {
+          "type": "string",
+          "enum": ["generate", "modify", "debug", "research"],
+          "description": "Tertiary classification: nature of the operation"
+        }
+      },
+      "required": ["output_type", "complexity", "intent"]
+    },
+
+    "domain": {
+      "type": "object",
+      "description": "Legacy domain classification (kept alongside taxonomy)",
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "Trading", "Data Engineering", "AI", "Software Dev",
+            "General", "Git Operations", "Knowledge Management",
+            "Agent Meta", "Agent Infrastructure", "Finance"
+          ]
+        },
+        "subcategory": {
+          "type": "string",
+          "enum": [
+            "Backtesting", "Data Extraction", "Model Training",
+            "Audio Processing", "Feature Dev", "Debugging",
+            "Rule Aggregation", "Workspace Auth", "Obsidian",
+            "Analysis", "Jesse TV Alignment", "Repository Management",
+            "Skill Customization", "Miscellaneous"
+          ]
+        }
+      },
+      "required": ["category", "subcategory"]
+    },
+
+    "source": {
+      "type": "object",
+      "description": "Provenance: the original Antigravity session",
+      "properties": {
+        "conversation_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9\\-]{36}$"
+        },
+        "transcript_path": {
+          "type": "string",
+          "description": "Absolute path to transcript_full.jsonl"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "created_at of the first USER_INPUT step"
+        }
+      },
+      "required": ["conversation_id", "transcript_path", "timestamp"]
+    },
+
+    "prompt": {
+      "type": "string",
+      "description": "Exact user request text (USER_INPUT content, XML tags stripped)"
+    },
+
+    "required_tools": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Tool names the agent must invoke to solve this task"
+    },
+    "required_skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Antigravity skill slugs consulted or triggered"
+    },
+
+    "roi_value": {
+      "type": "number",
+      "description": "Estimated value of correct task completion (USD or utility units)"
+    },
+    "target_token_budget": {
+      "type": "integer",
+      "description": "Expected token ceiling for an efficient solution"
+    },
+    "target_tool_call_budget": {
+      "type": "integer",
+      "description": "Expected tool-call ceiling for an efficient solution"
+    },
+
+    "setup_steps": {
+      "type": "array",
+      "description": "Sandbox initialization steps run before model execution",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["write_file", "run_command"] },
+          "path":    { "type": "string" },
+          "content": { "type": "string" },
+          "command": { "type": "string" }
+        },
+        "required": ["action"]
+      }
+    },
+
+    "validation_rules": {
+      "type": "array",
+      "description": "Definition of Done (DoD) — ordered assertions evaluated after execution",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["file_exists", "file_contains", "json_field_value", "llm_judge"]
+          },
+          "path":     { "type": "string", "description": "File path (file_exists / file_contains / json_field_value)" },
+          "text":     { "type": "string", "description": "Expected substring (file_contains)" },
+          "field":    { "type": "string", "description": "JSON key to check (json_field_value)" },
+          "expected": {                   "description": "Expected JSON field value (json_field_value)" },
+          "rubric":   { "type": "string", "description": "Plain-language rubric for LLM judge (llm_judge)" },
+          "min_score":{ "type": "number", "minimum": 0, "maximum": 1,
+                        "description": "Minimum judge score to pass (llm_judge); 0.0–1.0" }
+        },
+        "required": ["type"]
+      }
+    },
+
+    "evaluation_results": {
+      "type": "array",
+      "description": "Per-run execution records (one per model × config run)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "model_name":     { "type": "string" },
+          "model_config":   {
+            "type": "object",
+            "description": "Provider-specific config (e.g. {thinking_level: high} for Gemini)",
+            "additionalProperties": true
+          },
+          "completeness_percent": {
+            "type": "number", "minimum": 0, "maximum": 100,
+            "description": "Fraction of validation_rules passed × 100"
+          },
+          "input_tokens":   { "type": "integer" },
+          "output_tokens":  { "type": "integer" },
+          "tool_calls":     { "type": "integer" },
+          "cost_usd":       { "type": "number" },
+          "latency_seconds":{ "type": "number", "description": "Wall-clock time from first token to final response" },
+          "earned_roi":     { "type": "number", "description": "roi_value × (completeness_percent / 100)" },
+          "cost_effectiveness_roi_per_usd": { "type": "number", "description": "earned_roi / cost_usd" },
+          "timestamp":      { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "model_name", "model_config", "completeness_percent",
+          "input_tokens", "output_tokens", "tool_calls",
+          "cost_usd", "latency_seconds", "earned_roi",
+          "cost_effectiveness_roi_per_usd", "timestamp"
+        ]
+      }
+    }
+  },
+
+  "required": [
+    "task_id", "name", "taxonomy", "domain", "source",
+    "prompt", "roi_value", "target_token_budget",
+    "target_tool_call_budget", "setup_steps", "validation_rules"
+  ]
+}
