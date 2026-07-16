@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from bench_suite.runner import DEFAULT_PRICING
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "sandbox_isolation": "temp_dir",
     "registry_hash": {
@@ -17,6 +19,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "llm_judge_reference_model": "gemini-2.0-flash",
     "dynamic_growth_trigger": "manual",
     "chartjs_cdn": "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+    "default_model": "gemini-2.5-flash",
+    "default_model_config": {"thinking_level": "high"},
+    "gemini_pricing": {**DEFAULT_PRICING, "default": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}},
     "paths": {
         "data_root": ".scratch/bench-suite",
         "schema": ".scratch/bench-suite/task-schema.json",
@@ -25,6 +30,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "leaderboard": ".scratch/bench-suite/leaderboard.md",
         "dashboard_html": ".scratch/bench-suite/index.html",
         "pending_review": ".scratch/bench-suite/pending-review",
+        "classifier_rules": ".scratch/bench-suite/classifier_rules.json",
     },
 }
 

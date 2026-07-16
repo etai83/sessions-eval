@@ -9,6 +9,7 @@ description = "Antigravity Benchmarking Suite — offline golden path and evalua
 requires-python = ">=3.11"
 dependencies = [
     "jsonschema>=4.20",
+    "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]

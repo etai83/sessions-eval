@@ -4,10 +4,10 @@
 
 **Blocked by:** 09 — Offline golden path: schema store, score fixture task, publish board
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] setup_steps execute in a per-task sandbox before the model runs
-- [ ] Gemini API call returns model output plus tokens, cost_usd, and latency_seconds
-- [ ] Registry guard aborts with a clear warning when the pair was already evaluated
-- [ ] Successful live run appends EvaluationResult to the fixture TaskEntry and updates the registry
-- [ ] Regenerated leaderboard/dashboard include the live run metrics
+- [x] setup_steps execute in a per-task sandbox before the model runs
+- [x] Gemini API call returns model output plus tokens, cost_usd, and latency_seconds
+- [x] Registry guard aborts with a clear warning when the pair was already evaluated
+- [x] Successful live run appends EvaluationResult to the fixture TaskEntry and updates the registry
+- [x] Regenerated leaderboard/dashboard include the live run metrics

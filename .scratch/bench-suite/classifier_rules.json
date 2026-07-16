@@ -1,0 +1,77 @@
+{
+  "defaults": {
+    "output_type": "code",
+    "intent": "generate",
+    "category": "General",
+    "subcategory": "Miscellaneous"
+  },
+  "rules": [
+    {
+      "match": ["architecture", "wayfinder", "design doc", "adr", "spec", "plan.md"],
+      "output_type": "plan_or_spec"
+    },
+    {
+      "match": ["debug", "fix", "bug", "error", "failing", "stack trace"],
+      "intent": "debug",
+      "subcategory": "Debugging"
+    },
+    {
+      "match": ["modify", "change", "update", "refactor", "rename", "edit existing"],
+      "intent": "modify"
+    },
+    {
+      "match": ["research", "investigate", "analyse", "analyze", "how does", "what is"],
+      "intent": "research",
+      "subcategory": "Analysis"
+    },
+    {
+      "match": ["backtest", "trading", "strategy", "ohlc", "jesse", "pine script"],
+      "category": "Trading",
+      "subcategory": "Backtesting"
+    },
+    {
+      "match": ["transcribe", "audio", "m4a", "wav"],
+      "category": "Data Engineering",
+      "subcategory": "Audio Processing"
+    },
+    {
+      "match": ["extract", "etl", "pipeline", "csv", "parquet"],
+      "category": "Data Engineering",
+      "subcategory": "Data Extraction"
+    },
+    {
+      "match": ["obsidian", "daily note", "second brain", "wikilink"],
+      "category": "Knowledge Management",
+      "subcategory": "Obsidian"
+    },
+    {
+      "match": ["git ", "github", "gitlab", "pull request", "merge conflict"],
+      "category": "Git Operations",
+      "subcategory": "Repository Management"
+    },
+    {
+      "match": ["skill", "agent", "subagent", "antigravity", "benchmark"],
+      "category": "Agent Meta",
+      "subcategory": "Skill Customization"
+    },
+    {
+      "match": ["gemini", "llm", "model training", "embedding", "prompt"],
+      "category": "AI",
+      "subcategory": "Model Training"
+    },
+    {
+      "match": ["finance", "roi", "portfolio", "budget"],
+      "category": "Finance",
+      "subcategory": "Analysis"
+    },
+    {
+      "match": ["feature", "implement", "api", "module", "refactor codebase"],
+      "category": "Software Dev",
+      "subcategory": "Feature Dev"
+    }
+  ],
+  "complexity": {
+    "single_step_max_tools": 2,
+    "multi_agent_tools": ["invoke_subagent", "browser_subagent"]
+  }
+}

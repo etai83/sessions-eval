@@ -9,6 +9,14 @@
   "llm_judge_reference_model": "gemini-2.0-flash",
   "dynamic_growth_trigger": "manual",
   "chartjs_cdn": "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+  "default_model": "gemini-2.5-flash",
+  "default_model_config": {"thinking_level": "high"},
+  "gemini_pricing": {
+    "gemini-2.5-flash": {"input_per_mtok": 0.15, "output_per_mtok": 0.60},
+    "gemini-2.0-flash": {"input_per_mtok": 0.10, "output_per_mtok": 0.40},
+    "gemini-2.5-pro": {"input_per_mtok": 1.25, "output_per_mtok": 10.0},
+    "default": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}
+  },
   "paths": {
     "data_root": ".scratch/bench-suite",
     "schema": ".scratch/bench-suite/task-schema.json",
@@ -16,6 +24,7 @@
     "registry": ".scratch/bench-suite/registry.json",
     "leaderboard": ".scratch/bench-suite/leaderboard.md",
     "dashboard_html": ".scratch/bench-suite/index.html",
-    "pending_review": ".scratch/bench-suite/pending-review"
+    "pending_review": ".scratch/bench-suite/pending-review",
+    "classifier_rules": ".scratch/bench-suite/classifier_rules.json"
   }
 }

@@ -13,6 +13,7 @@ from bench_suite.config import load_config
 from bench_suite.dashboard import DashboardGenerator
 from bench_suite.evaluator import Evaluator, strip_diagnostic_fields
 from bench_suite.registry import Registry
+from bench_suite.sandbox import apply_setup_steps
 from bench_suite.store import DatasetStore
 
 
@@ -35,20 +36,6 @@ def prepare_passing_sandbox(sandbox: Path) -> None:
         json.dumps({"status": "ok", "greeting": "Hello bench-suite"}, indent=2) + "\n",
         encoding="utf-8",
     )
-
-
-def apply_setup_steps(task: dict[str, Any], sandbox: Path) -> None:
-    for step in task.get("setup_steps") or []:
-        action = step["action"]
-        if action == "write_file":
-            path = sandbox / step["path"]
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(step.get("content") or "", encoding="utf-8")
-        elif action == "run_command":
-            # Offline path does not shell out; reserved for live runner.
-            continue
-        else:
-            raise ValueError(f"Unknown setup action: {action}")
 
 
 def run_offline_golden_path(
@@ -75,7 +62,7 @@ def run_offline_golden_path(
     sandbox = Path(sandbox_dir) if sandbox_dir else Path(tempfile.mkdtemp(prefix="bench-suite-"))
     sandbox.mkdir(parents=True, exist_ok=True)
     try:
-        apply_setup_steps(task, sandbox)
+        apply_setup_steps(task, sandbox, allow_commands=False)
         prepare_passing_sandbox(sandbox)
 
         execution = dict(fake_execution or FAKE_EXECUTION)

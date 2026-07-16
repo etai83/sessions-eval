@@ -4,10 +4,10 @@
 
 **Blocked by:** 09 — Offline golden path: schema store, score fixture task, publish board
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Ingester reads transcript_full.jsonl (not the compact transcript) and emits a TaskCandidate with the extractable fields from the spec
-- [ ] User request text has USER_REQUEST XML tags stripped
-- [ ] Tool invocations are derived from PLANNER_RESPONSE tool_calls (and sequential result steps where applicable)
-- [ ] Classifier maps user_request → taxonomy + domain labels using a keyword rules mapping (deterministic, zero API cost)
-- [ ] Behaviour is verifiable on a known transcript or fixture without sampling or evaluation
+- [x] Ingester reads transcript_full.jsonl (not the compact transcript) and emits a TaskCandidate with the extractable fields from the spec
+- [x] User request text has USER_REQUEST XML tags stripped
+- [x] Tool invocations are derived from PLANNER_RESPONSE tool_calls (and sequential result steps where applicable)
+- [x] Classifier maps user_request → taxonomy + domain labels using a keyword rules mapping (deterministic, zero API cost)
+- [x] Behaviour is verifiable on a known transcript or fixture without sampling or evaluation
