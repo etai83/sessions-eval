@@ -99,7 +99,20 @@ def run_live_task(
                 stacklevel=2,
             )
 
-        result = Evaluator().evaluate(task, sandbox, run.execution)
+        # Judge uses the same client transport but a fixed reference model from config
+        # (never the model under evaluation — conflict of interest).
+        evaluator = Evaluator(
+            judge_client=gemini,
+            judge_model=str(
+                config.get("llm_judge_reference_model") or "gemini-2.0-flash"
+            ),
+        )
+        result = evaluator.evaluate(
+            task,
+            sandbox,
+            run.execution,
+            model_response=run.model_response,
+        )
         clean = strip_diagnostic_fields(result)
 
         task = dict(task)

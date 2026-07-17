@@ -1,15 +1,109 @@
-"""Deterministic DoD evaluator and scoring formulas."""
+"""DoD evaluator: deterministic rules + optional llm_judge overlay."""
 
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+# Cap artifact text sent to the judge to keep prompts bounded.
+_MAX_ARTIFACT_CHARS = 12_000
+
+JUDGE_SYSTEM_INSTRUCTION = """You are a strict evaluation judge for coding-agent benchmarks.
+Score the provided artifact against the rubric on a continuous scale from 0.0 to 1.0.
+Respond with ONLY a single JSON object (no markdown fences), shape:
+{"score": <float 0.0-1.0>, "rationale": "<short reason>"}
+Do not reward the model under evaluation for style alone — apply the rubric literally.
+"""
+
+
+class JudgeClient(Protocol):
+    """Minimal client surface needed for llm_judge (matches GeminiClient.generate)."""
+
+    def generate(
+        self,
+        *,
+        model_name: str,
+        prompt: str,
+        system_instruction: str,
+        model_config: dict[str, Any],
+    ) -> Any: ...
+
+
+def parse_judge_score(text: str) -> float:
+    """
+    Extract a 0.0–1.0 score from a judge model response.
+
+    Accepts JSON ``{"score": …}`` (optionally fenced), or a bare float.
+    Unparseable / missing → 0.0. Out-of-range values are clamped.
+    """
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return 0.0
+
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
+    if fence:
+        cleaned = fence.group(1).strip()
+
+    # Prefer JSON object with "score"
+    try:
+        data = json.loads(cleaned)
+        if isinstance(data, dict) and "score" in data:
+            return _clamp01(float(data["score"]))
+        if isinstance(data, (int, float)):
+            return _clamp01(float(data))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+
+    # First {...} blob containing score
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            data = json.loads(cleaned[start : end + 1])
+            if isinstance(data, dict) and "score" in data:
+                return _clamp01(float(data["score"]))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
+    # Bare float anywhere in the text (prefer first match)
+    match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
+    if match:
+        try:
+            return _clamp01(float(match.group(0)))
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def _clamp01(value: float) -> float:
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return float(value)
 
 
 class Evaluator:
-    """Score a TaskEntry against a sandbox filesystem using deterministic rules."""
+    """
+    Score a TaskEntry against a sandbox filesystem.
+
+    Deterministic rules always run. Optional ``llm_judge`` rules call a fixed
+    reference model via ``judge_client`` (never the model under evaluation).
+    Without a judge client, llm_judge rules fail closed (offline-safe).
+    """
+
+    def __init__(
+        self,
+        *,
+        judge_client: JudgeClient | None = None,
+        judge_model: str = "gemini-2.0-flash",
+        judge_model_config: dict[str, Any] | None = None,
+    ) -> None:
+        self.judge_client = judge_client
+        self.judge_model = judge_model
+        self.judge_model_config = dict(judge_model_config or {"temperature": 0})
 
     def evaluate(
         self,
@@ -18,6 +112,7 @@ class Evaluator:
         execution: dict[str, Any],
         *,
         timestamp: str | None = None,
+        model_response: str | None = None,
     ) -> dict[str, Any]:
         sandbox_root = Path(sandbox_root)
         rules = task.get("validation_rules") or []
@@ -25,8 +120,19 @@ class Evaluator:
             completeness = 100.0
             rules_passed = 0
             total_rules = 0
+            judge_scores: list[float] = []
         else:
-            results = [self._check_rule(rule, sandbox_root) for rule in rules]
+            results: list[bool] = []
+            judge_scores = []
+            for rule in rules:
+                if rule.get("type") == "llm_judge":
+                    ok, score = self._check_llm_judge(
+                        rule, sandbox_root, model_response=model_response
+                    )
+                    results.append(ok)
+                    judge_scores.append(score)
+                else:
+                    results.append(self._check_rule(rule, sandbox_root))
             rules_passed = sum(1 for ok in results if ok)
             total_rules = len(rules)
             completeness = (rules_passed / total_rules) * 100.0
@@ -43,7 +149,7 @@ class Evaluator:
             "+00:00", "Z"
         )
 
-        return {
+        out: dict[str, Any] = {
             "model_name": execution["model_name"],
             "model_config": execution["model_config"],
             "completeness_percent": completeness,
@@ -59,12 +165,101 @@ class Evaluator:
             "_rules_passed": rules_passed,
             "_total_rules": total_rules,
         }
+        if judge_scores:
+            out["_judge_scores"] = judge_scores
+        return out
+
+    def _check_llm_judge(
+        self,
+        rule: dict[str, Any],
+        sandbox_root: Path,
+        *,
+        model_response: str | None = None,
+    ) -> tuple[bool, float]:
+        """Return (passed, score). Score is 0.0 when the judge cannot run."""
+        min_score = float(rule.get("min_score", 0.7))
+        if self.judge_client is None:
+            return False, 0.0
+
+        artifact = self._artifact_for_judge(
+            rule, sandbox_root, model_response=model_response
+        )
+        rubric = str(rule.get("rubric") or "")
+        prompt = (
+            f"## Rubric\n{rubric}\n\n"
+            f"## Artifact under review\n{artifact}\n\n"
+            "Return JSON with score in [0.0, 1.0]."
+        )
+        gen = self.judge_client.generate(
+            model_name=self.judge_model,
+            prompt=prompt,
+            system_instruction=JUDGE_SYSTEM_INSTRUCTION,
+            model_config=self.judge_model_config,
+        )
+        text = getattr(gen, "text", None) or str(gen)
+        score = parse_judge_score(text)
+        return score >= min_score, score
+
+    def _artifact_for_judge(
+        self,
+        rule: dict[str, Any],
+        sandbox_root: Path,
+        *,
+        model_response: str | None = None,
+    ) -> str:
+        """Build the text blob the judge scores (path, sandbox files, model response)."""
+        parts: list[str] = []
+        path_str = rule.get("path")
+        if path_str:
+            path = self._resolve(str(path_str), sandbox_root)
+            if not path.is_file():
+                parts.append(f"(missing file: {path_str})")
+            else:
+                parts.append(self._read_capped(path))
+        else:
+            # No path: summarize relative files under the sandbox
+            if not sandbox_root.is_dir():
+                parts.append("(empty sandbox)")
+            else:
+                chunks: list[str] = []
+                total = 0
+                for path in sorted(sandbox_root.rglob("*")):
+                    if not path.is_file():
+                        continue
+                    rel = path.relative_to(sandbox_root).as_posix()
+                    body = self._read_capped(path, remaining=_MAX_ARTIFACT_CHARS - total)
+                    chunk = f"### {rel}\n{body}\n"
+                    chunks.append(chunk)
+                    total += len(chunk)
+                    if total >= _MAX_ARTIFACT_CHARS:
+                        chunks.append("… (truncated)")
+                        break
+                parts.append("\n".join(chunks) if chunks else "(empty sandbox)")
+
+        if model_response:
+            capped = model_response[:_MAX_ARTIFACT_CHARS]
+            if len(model_response) > _MAX_ARTIFACT_CHARS:
+                capped += "\n… (truncated)"
+            parts.append(f"## Model response\n{capped}")
+
+        return "\n\n".join(parts)
+
+    def _read_capped(self, path: Path, *, remaining: int | None = None) -> str:
+        limit = _MAX_ARTIFACT_CHARS if remaining is None else max(0, remaining)
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            return f"(unreadable: {exc})"
+        if len(text) > limit:
+            return text[:limit] + "\n… (truncated)"
+        return text
 
     def _check_rule(self, rule: dict[str, Any], sandbox_root: Path) -> bool:
         rule_type = rule["type"]
         if rule_type == "llm_judge":
-            # Offline / ticket 09: no Gemini API. Ticket 14 will implement this.
-            return False
+            # Prefer evaluate()'s _check_llm_judge path; fail closed if hit here without response
+            ok, _ = self._check_llm_judge(rule, sandbox_root, model_response=None)
+            return ok
         if rule_type == "file_exists":
             return self._resolve(rule["path"], sandbox_root).exists()
         if rule_type == "file_contains":
