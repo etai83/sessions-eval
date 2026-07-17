@@ -30,6 +30,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     live.add_argument("--repo-root", type=Path, default=None)
     live.add_argument("--task", type=Path, default=None, help="TaskEntry JSON path")
+    live.add_argument(
+        "--task-id",
+        default=None,
+        help="Load TaskEntry from dataset/tasks by id (e.g. trading_btc_backtest_01)",
+    )
     live.add_argument("--model", default="gemini-2.5-flash")
     live.add_argument(
         "--model-config",
@@ -109,11 +114,15 @@ def main(argv: list[str] | None = None) -> int:
             result = run_live_task(
                 repo_root=args.repo_root,
                 task_path=args.task,
+                task_id=args.task_id,
                 model_name=args.model,
                 model_config=model_config,
                 force=args.force,
             )
         except AlreadyEvaluatedError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        except (ValueError, FileNotFoundError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
         print(json.dumps({k: v for k, v in result.items() if k != "model_response"}, indent=2))

@@ -1,0 +1,47 @@
+{
+  "task_id": "trading_btc_backtest_01",
+  "name": "BTC Trading Strategy Backtest Script",
+  "taxonomy": {
+    "output_type": "code",
+    "complexity": "multi_tool",
+    "intent": "debug"
+  },
+  "domain": {
+    "category": "Trading",
+    "subcategory": "Backtesting"
+  },
+  "source": {
+    "conversation_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "transcript_path": ".scratch/bench-suite/fixtures/transcripts/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/.system_generated/logs/transcript_full.jsonl",
+    "timestamp": "2026-06-17T19:38:28Z"
+  },
+  "prompt": "Create a Python backtesting script for my trading strategy on BTC.\nWrite the file to experiments/backtest.py and fix any import bugs.",
+  "required_tools": ["write_to_file", "run_command", "view_file"],
+  "required_skills": [],
+  "roi_value": 50.0,
+  "target_token_budget": 8000,
+  "target_tool_call_budget": 12,
+  "setup_steps": [
+    {
+      "action": "write_file",
+      "path": "experiments/strategy_params.json",
+      "content": "{\"symbol\": \"BTC\", \"timeframe\": \"1h\", \"capital\": 10000}"
+    }
+  ],
+  "validation_rules": [
+    {
+      "type": "file_exists",
+      "path": "experiments/backtest.py"
+    },
+    {
+      "type": "file_contains",
+      "path": "experiments/backtest.py",
+      "text": "backtest"
+    },
+    {
+      "type": "file_exists",
+      "path": "experiments/strategy_params.json"
+    }
+  ],
+  "evaluation_results": []
+}

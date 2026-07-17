@@ -29,6 +29,7 @@ def run_live_task(
     *,
     repo_root: Path | None = None,
     task_path: Path | None = None,
+    task_id: str | None = None,
     model_name: str = "gemini-2.5-flash",
     model_config: dict[str, Any] | None = None,
     client: GeminiClient | None = None,
@@ -36,7 +37,12 @@ def run_live_task(
     force: bool = False,
 ) -> dict[str, Any]:
     """
-    End-to-end live path for one TaskEntry (default: offline golden fixture).
+    End-to-end live path for one TaskEntry.
+
+    Resolution order for the task:
+    1. ``task_id`` — load from the dataset store
+    2. ``task_path`` — load JSON path (and prefer dataset copy if already promoted)
+    3. Default — offline golden fixture
 
     Runner checks registry BEFORE calling the API. On success: append
     EvaluationResult, record registry, regenerate leaderboard + index.html.
@@ -47,16 +53,21 @@ def run_live_task(
     model_config = dict(model_config or {"thinking_level": "high"})
 
     store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
-    source = (
-        Path(task_path)
-        if task_path
-        else root / ".scratch/bench-suite/fixtures/offline_golden_task.json"
-    )
-    loaded = store.load_path(source)
-    if store.task_path(loaded["task_id"]).is_file():
-        task = store.load(loaded["task_id"])
+    if task_id and task_path:
+        raise ValueError("Pass only one of task_id or task_path, not both")
+    if task_id:
+        task = store.load(task_id)
     else:
-        task = loaded
+        source = (
+            Path(task_path)
+            if task_path
+            else root / ".scratch/bench-suite/fixtures/offline_golden_task.json"
+        )
+        loaded = store.load_path(source)
+        if store.task_path(loaded["task_id"]).is_file():
+            task = store.load(loaded["task_id"])
+        else:
+            task = loaded
 
     hash_cfg = config.get("registry_hash") or {}
     registry = Registry(
