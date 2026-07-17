@@ -10,7 +10,13 @@ from pathlib import Path
 from bench_suite.live import run_live_task
 from bench_suite.offline import run_offline_golden_path
 from bench_suite.runner import AlreadyEvaluatedError
-from bench_suite.pipeline import transcript_to_candidate, sample_and_write_pending, promote_task
+from bench_suite.pipeline import (
+    batch_eval,
+    promote_task,
+    refresh_corpus,
+    sample_and_write_pending,
+    transcript_to_candidate,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,6 +100,53 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to candidate_<conv-id>.json in pending-review/",
     )
     promote.add_argument("--repo-root", type=Path, default=None)
+
+    batch = sub.add_parser(
+        "batch-eval",
+        help="Live-eval every dataset task for one model×config; skip registry hits",
+    )
+    batch.add_argument("--repo-root", type=Path, default=None)
+    batch.add_argument("--model", default="gemini-2.5-flash")
+    batch.add_argument(
+        "--model-config",
+        default='{"thinking_level":"high"}',
+        help="JSON object for model_config",
+    )
+    batch.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-run pairs already in the registry (still appends new results)",
+    )
+
+    refresh = sub.add_parser(
+        "refresh",
+        help="Discover transcripts → classify → stratified sample into pending-review (additive)",
+    )
+    refresh.add_argument("--repo-root", type=Path, default=None)
+    refresh.add_argument(
+        "--transcripts-root",
+        type=Path,
+        default=None,
+        help="Directory to scan recursively for transcript_full.jsonl",
+    )
+    refresh.add_argument(
+        "transcripts",
+        nargs="*",
+        type=Path,
+        help="Optional explicit transcript_full.jsonl paths",
+    )
+    refresh.add_argument(
+        "--rules",
+        type=Path,
+        default=None,
+        help="Path to classifier_rules.json",
+    )
+    refresh.add_argument(
+        "--target",
+        type=int,
+        default=20,
+        help="Dataset capacity target (default: 20); only remaining slots are filled",
+    )
 
     args = parser.parse_args(argv)
 
@@ -188,6 +241,51 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(json.dumps(result, indent=2))
         print(f"\nPromoted: task_id={result['task_id']} → {result['dataset_path']}", file=sys.stderr)
+        return 0
+
+    if args.command == "batch-eval":
+        model_config = json.loads(args.model_config)
+        result = batch_eval(
+            repo_root=args.repo_root,
+            model_name=args.model,
+            model_config=model_config,
+            force=args.force,
+        )
+        print(json.dumps(result, indent=2))
+        print(
+            f"\nBatch eval complete: ran={result['ran']} skipped={result['skipped']} "
+            f"failed={result['failed']} total={result['tasks_total']} "
+            f"leaderboard={result['leaderboard_path']}",
+            file=sys.stderr,
+        )
+        return 1 if result["failed"] else 0
+
+    if args.command == "refresh":
+        if not args.transcripts and not args.transcripts_root:
+            print(
+                "refresh requires --transcripts-root and/or explicit transcript paths",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            result = refresh_corpus(
+                repo_root=args.repo_root,
+                transcripts_root=args.transcripts_root,
+                transcript_paths=args.transcripts or None,
+                rules_path=args.rules,
+                target_total=args.target,
+            )
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(json.dumps(result, indent=2))
+        print(
+            f"\nRefresh complete: discovered={result['transcripts_discovered']} "
+            f"selected={result['candidates_selected']} "
+            f"target_new={result['target_new']} "
+            f"pending-review={result['pending_review']}",
+            file=sys.stderr,
+        )
         return 0
 
     parser.error(f"Unknown command: {args.command}")

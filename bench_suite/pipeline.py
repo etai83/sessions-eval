@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -106,5 +107,178 @@ def promote_task(
     return {
         "task_id": task["task_id"],
         "dataset_path": str(dest),
+    }
+
+
+def discover_transcripts(root: Path | str) -> list[Path]:
+    """Find all ``transcript_full.jsonl`` files under a corpus root (sorted)."""
+    root_path = Path(root)
+    if not root_path.is_dir():
+        raise FileNotFoundError(f"Transcripts root is not a directory: {root_path}")
+    return sorted(root_path.rglob("transcript_full.jsonl"))
+
+
+def refresh_corpus(
+    *,
+    repo_root: Path | str | None = None,
+    transcripts_root: Path | str | None = None,
+    transcript_paths: list[Path | str] | None = None,
+    rules_path: Path | str | None = None,
+    target_total: int = 20,
+) -> dict[str, Any]:
+    """
+    Additive corpus refresh: discover/classify new sessions → pending-review.
+
+    - Never writes or mutates ``dataset/tasks`` (existing TaskEntries untouched).
+    - Skips conversation_ids already in the dataset.
+    - ``write_pending`` is idempotent (never clobbers human edits in pending-review).
+    - ``target_total`` is the dataset capacity; only ``target_total - len(dataset)``
+      new candidates are selected.
+    """
+    from bench_suite.config import load_config
+    from bench_suite.store import DatasetStore
+
+    root = (Path(repo_root) if repo_root else Path.cwd()).resolve()
+    config = load_config(repo_root=root)
+    paths = config["_resolved_paths"]
+
+    discovered: list[Path] = []
+    if transcript_paths:
+        discovered.extend(Path(p) for p in transcript_paths)
+    if transcripts_root is not None:
+        discovered.extend(discover_transcripts(transcripts_root))
+    # Dedup while preserving order
+    seen_paths: set[Path] = set()
+    unique_paths: list[Path] = []
+    for p in discovered:
+        resolved = p.resolve()
+        if resolved in seen_paths:
+            continue
+        seen_paths.add(resolved)
+        unique_paths.append(p)
+
+    store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
+    existing_tasks = store.list_tasks()
+    existing_ids = {
+        t["source"]["conversation_id"] for t in existing_tasks if t.get("source")
+    }
+    remaining = max(0, int(target_total) - len(existing_tasks))
+
+    if remaining == 0 or not unique_paths:
+        return {
+            "transcripts_discovered": len(unique_paths),
+            "candidates_ingested": 0,
+            "candidates_selected": 0,
+            "target_new": remaining,
+            "paths_written": [],
+            "pending_review": paths["pending_review"],
+            "dataset_task_count": len(existing_tasks),
+        }
+
+    sample_result = sample_and_write_pending(
+        unique_paths,
+        rules_path=rules_path,
+        pending_dir=paths["pending_review"],
+        existing_ids=existing_ids,
+        target_total=remaining,
+        repo_root=root,
+    )
+    return {
+        "transcripts_discovered": len(unique_paths),
+        "candidates_ingested": sample_result["candidates_ingested"],
+        "candidates_selected": sample_result["candidates_selected"],
+        "target_new": remaining,
+        "paths_written": sample_result["paths_written"],
+        "pending_review": paths["pending_review"],
+        "dataset_task_count": len(existing_tasks),
+    }
+
+
+def batch_eval(
+    *,
+    repo_root: Path | str | None = None,
+    model_name: str = "gemini-2.5-flash",
+    model_config: dict[str, Any] | None = None,
+    client: Any | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """
+    Evaluate every dataset TaskEntry for one model × model_config.
+
+    Pairs already present in the registry are skipped (no API call) unless
+    ``force`` is True. After the batch, leaderboard.md and index.html are
+    regenerated from the full dataset.
+    """
+    from bench_suite.config import load_config
+    from bench_suite.dashboard import DashboardGenerator
+    from bench_suite.live import run_live_task
+    from bench_suite.registry import Registry
+    from bench_suite.runner import AlreadyEvaluatedError
+    from bench_suite.store import DatasetStore
+
+    root = (Path(repo_root) if repo_root else Path.cwd()).resolve()
+    config = load_config(repo_root=root)
+    paths = config["_resolved_paths"]
+    model_config = dict(model_config or {"thinking_level": "high"})
+
+    store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
+    hash_cfg = config.get("registry_hash") or {}
+    registry = Registry(
+        Path(paths["registry"]),
+        truncate_hex=int(hash_cfg.get("truncate_hex", 8)),
+        algorithm=str(hash_cfg.get("algorithm", "sha256")),
+    )
+
+    tasks = store.list_tasks()
+    ran_ids: list[str] = []
+    skipped_ids: list[str] = []
+    failed: list[dict[str, str]] = []
+
+    for task in tasks:
+        task_id = task["task_id"]
+        if not force and registry.has_run(model_name, model_config, task_id):
+            skipped_ids.append(task_id)
+            continue
+        try:
+            run_live_task(
+                repo_root=root,
+                task_id=task_id,
+                model_name=model_name,
+                model_config=model_config,
+                client=client,
+                force=force,
+            )
+            ran_ids.append(task_id)
+        except AlreadyEvaluatedError:
+            # Race: registry updated between has_run and run; treat as skip
+            skipped_ids.append(task_id)
+        except Exception as exc:  # noqa: BLE001 — batch continues on per-task failure
+            warnings.warn(
+                f"batch_eval: task {task_id} failed: {exc}",
+                stacklevel=2,
+            )
+            failed.append({"task_id": task_id, "error": str(exc)})
+
+    # Always regenerate dashboard so skipped-only runs still refresh the board
+    rows = DashboardGenerator(chartjs_cdn=config["chartjs_cdn"]).generate(
+        store.list_tasks(),
+        leaderboard_path=Path(paths["leaderboard"]),
+        html_path=Path(paths["dashboard_html"]),
+    )
+
+    return {
+        "model_name": model_name,
+        "model_config": model_config,
+        "tasks_total": len(tasks),
+        "ran": len(ran_ids),
+        "skipped": len(skipped_ids),
+        "failed": len(failed),
+        "ran_task_ids": ran_ids,
+        "skipped_task_ids": skipped_ids,
+        "failures": failed,
+        "leaderboard_rows": rows,
+        "leaderboard_path": paths["leaderboard"],
+        "dashboard_html_path": paths["dashboard_html"],
+        "registry_path": paths["registry"],
     }
 
