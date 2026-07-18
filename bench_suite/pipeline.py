@@ -197,7 +197,7 @@ def refresh_corpus(
 def batch_eval(
     *,
     repo_root: Path | str | None = None,
-    model_name: str = "gemini-2.5-flash",
+    model_name: str | None = None,
     model_config: dict[str, Any] | None = None,
     client: Any | None = None,
     force: bool = False,
@@ -219,7 +219,12 @@ def batch_eval(
     root = (Path(repo_root) if repo_root else Path.cwd()).resolve()
     config = load_config(repo_root=root)
     paths = config["_resolved_paths"]
-    model_config = dict(model_config or {"thinking_level": "high"})
+    model_name = model_name or str(config.get("default_model") or "gemini-3.5-flash")
+    model_config = dict(
+        model_config
+        if model_config is not None
+        else (config.get("default_model_config") or {"thinking_level": "high"})
+    )
 
     store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
     hash_cfg = config.get("registry_hash") or {}

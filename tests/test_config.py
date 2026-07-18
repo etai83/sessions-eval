@@ -9,7 +9,7 @@ from bench_suite.config import DEFAULT_CONFIG, load_config
 
 def test_defaults_include_open_question_resolutions() -> None:
     assert DEFAULT_CONFIG["sandbox_isolation"] == "temp_dir"
-    assert DEFAULT_CONFIG["llm_judge_reference_model"] == "gemini-2.0-flash"
+    assert DEFAULT_CONFIG["llm_judge_reference_model"] == "gemini-3.1-flash-lite"
     assert DEFAULT_CONFIG["dynamic_growth_trigger"] == "manual"
     assert "chart.js@4.4.1" in DEFAULT_CONFIG["chartjs_cdn"]
     assert DEFAULT_CONFIG["registry_hash"]["truncate_hex"] == 8

@@ -98,7 +98,7 @@ class Evaluator:
         self,
         *,
         judge_client: JudgeClient | None = None,
-        judge_model: str = "gemini-2.0-flash",
+        judge_model: str = "gemini-3.1-flash-lite",
         judge_model_config: dict[str, Any] | None = None,
     ) -> None:
         self.judge_client = judge_client

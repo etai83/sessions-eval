@@ -30,7 +30,7 @@ def run_live_task(
     repo_root: Path | None = None,
     task_path: Path | None = None,
     task_id: str | None = None,
-    model_name: str = "gemini-2.5-flash",
+    model_name: str | None = None,
     model_config: dict[str, Any] | None = None,
     client: GeminiClient | None = None,
     sandbox_dir: Path | None = None,
@@ -50,7 +50,12 @@ def run_live_task(
     root = (repo_root or Path.cwd()).resolve()
     config = load_config(repo_root=root)
     paths = config["_resolved_paths"]
-    model_config = dict(model_config or {"thinking_level": "high"})
+    model_name = model_name or str(config.get("default_model") or "gemini-3.5-flash")
+    model_config = dict(
+        model_config
+        if model_config is not None
+        else (config.get("default_model_config") or {"thinking_level": "high"})
+    )
 
     store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
     if task_id and task_path:
@@ -104,7 +109,7 @@ def run_live_task(
         evaluator = Evaluator(
             judge_client=gemini,
             judge_model=str(
-                config.get("llm_judge_reference_model") or "gemini-2.0-flash"
+                config.get("llm_judge_reference_model") or "gemini-3.1-flash-lite"
             ),
         )
         result = evaluator.evaluate(

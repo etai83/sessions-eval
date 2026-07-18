@@ -18,10 +18,15 @@ class AlreadyEvaluatedError(RuntimeError):
 
 
 # Default USD per 1M tokens (approximate public Gemini list prices; override in config).
+# Paid-tier standard rates as of 2026-07; free tier is $0.
 DEFAULT_PRICING: dict[str, dict[str, float]] = {
-    "gemini-2.5-flash": {"input_per_mtok": 0.15, "output_per_mtok": 0.60},
-    "gemini-2.0-flash": {"input_per_mtok": 0.10, "output_per_mtok": 0.40},
+    "gemini-3.5-flash": {"input_per_mtok": 1.50, "output_per_mtok": 9.00},
+    "gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.50},
+    "gemini-3-flash-preview": {"input_per_mtok": 0.50, "output_per_mtok": 3.00},
+    "gemini-2.5-flash": {"input_per_mtok": 0.30, "output_per_mtok": 2.50},
+    "gemini-2.5-flash-lite": {"input_per_mtok": 0.10, "output_per_mtok": 0.40},
     "gemini-2.5-pro": {"input_per_mtok": 1.25, "output_per_mtok": 10.0},
+    "default": {"input_per_mtok": 0.25, "output_per_mtok": 1.50},
 }
 
 RESPONSE_PROTOCOL = """You are completing a benchmark task inside a filesystem sandbox.
@@ -121,18 +126,34 @@ class GoogleGenaiClient:
             config_kwargs["max_output_tokens"] = model_config["max_output_tokens"]
         if "thinking_level" in model_config:
             # Best-effort mapping for SDKs that expose ThinkingConfig.
-            level = str(model_config["thinking_level"]).upper()
+            # Gemini 3.x prefers thinking_level=; older SDKs used thinking_budget=.
+            level = str(model_config["thinking_level"]).lower()
             thinking_cls = getattr(types, "ThinkingConfig", None)
             if thinking_cls is not None:
-                config_kwargs["thinking_config"] = thinking_cls(
-                    thinking_budget=-1 if level in {"HIGH", "DEFAULT"} else 0
-                )
+                try:
+                    config_kwargs["thinking_config"] = thinking_cls(thinking_level=level)
+                except TypeError:
+                    config_kwargs["thinking_config"] = thinking_cls(
+                        thinking_budget=-1 if level in {"high", "default"} else 0
+                    )
 
-        response = self._client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(**config_kwargs),
-        )
+        try:
+            response = self._client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(**config_kwargs),
+            )
+        except Exception as exc:
+            # Surface a clear migration hint for retired model IDs (404 NOT_FOUND).
+            msg = str(exc)
+            if "404" in msg or "NOT_FOUND" in msg or "no longer available" in msg.lower():
+                raise RuntimeError(
+                    f"Gemini model {model_name!r} is unavailable ({exc}). "
+                    "Try --model gemini-3.5-flash or gemini-3.1-flash-lite, "
+                    "and update default_model / llm_judge_reference_model in "
+                    ".scratch/bench-suite/config.json."
+                ) from exc
+            raise
 
         text = getattr(response, "text", None) or ""
         usage = getattr(response, "usage_metadata", None)

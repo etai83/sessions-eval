@@ -6,16 +6,19 @@
     "json_sort_keys": true,
     "json_separators": [",", ":"]
   },
-  "llm_judge_reference_model": "gemini-2.0-flash",
+  "llm_judge_reference_model": "gemini-3.1-flash-lite",
   "dynamic_growth_trigger": "manual",
   "chartjs_cdn": "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
-  "default_model": "gemini-2.5-flash",
+  "default_model": "gemini-3.5-flash",
   "default_model_config": {"thinking_level": "high"},
   "gemini_pricing": {
-    "gemini-2.5-flash": {"input_per_mtok": 0.15, "output_per_mtok": 0.60},
-    "gemini-2.0-flash": {"input_per_mtok": 0.10, "output_per_mtok": 0.40},
+    "gemini-3.5-flash": {"input_per_mtok": 1.50, "output_per_mtok": 9.00},
+    "gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.50},
+    "gemini-3-flash-preview": {"input_per_mtok": 0.50, "output_per_mtok": 3.00},
+    "gemini-2.5-flash": {"input_per_mtok": 0.30, "output_per_mtok": 2.50},
+    "gemini-2.5-flash-lite": {"input_per_mtok": 0.10, "output_per_mtok": 0.40},
     "gemini-2.5-pro": {"input_per_mtok": 1.25, "output_per_mtok": 10.0},
-    "default": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}
+    "default": {"input_per_mtok": 0.25, "output_per_mtok": 1.50}
   },
   "paths": {
     "data_root": ".scratch/bench-suite",

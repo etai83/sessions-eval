@@ -112,7 +112,7 @@ class TestBatchEval:
 
         result = batch_eval(
             repo_root=tmp_suite,
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3.5-flash",
             model_config={"thinking_level": "high"},
             client=client,
         )
@@ -135,11 +135,11 @@ class TestBatchEval:
             assert saved["evaluation_results"][0]["completeness_percent"] == 100.0
 
         reg = Registry(tmp_suite / ".scratch/bench-suite/registry.json")
-        assert reg.has_run("gemini-2.5-flash", {"thinking_level": "high"}, "batch_a_01")
-        assert reg.has_run("gemini-2.5-flash", {"thinking_level": "high"}, "batch_b_01")
+        assert reg.has_run("gemini-3.5-flash", {"thinking_level": "high"}, "batch_a_01")
+        assert reg.has_run("gemini-3.5-flash", {"thinking_level": "high"}, "batch_b_01")
 
         md = (tmp_suite / ".scratch/bench-suite/leaderboard.md").read_text(encoding="utf-8")
-        assert "gemini-2.5-flash" in md
+        assert "gemini-3.5-flash" in md
         html = (tmp_suite / ".scratch/bench-suite/index.html").read_text(encoding="utf-8")
         assert "chart.js" in html
 
@@ -152,12 +152,12 @@ class TestBatchEval:
 
         # Pre-record A in registry
         reg = Registry(tmp_suite / ".scratch/bench-suite/registry.json")
-        reg.record("gemini-2.5-flash", {"thinking_level": "high"}, "batch_a_01")
+        reg.record("gemini-3.5-flash", {"thinking_level": "high"}, "batch_a_01")
 
         client = MultiTaskMockClient()
         result = batch_eval(
             repo_root=tmp_suite,
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3.5-flash",
             model_config={"thinking_level": "high"},
             client=client,
         )
@@ -180,7 +180,7 @@ class TestBatchEval:
         task = _minimal_task("batch_a_01", "aaaaaaaa-0000-4000-8000-0000000000a1")
         task["evaluation_results"] = [
             {
-                "model_name": "gemini-2.5-flash",
+                "model_name": "gemini-3.5-flash",
                 "model_config": {"thinking_level": "high"},
                 "completeness_percent": 100.0,
                 "input_tokens": 10,
@@ -195,12 +195,12 @@ class TestBatchEval:
         ]
         _setup_suite_with_tasks(tmp_suite, [task])
         reg = Registry(tmp_suite / ".scratch/bench-suite/registry.json")
-        reg.record("gemini-2.5-flash", {"thinking_level": "high"}, "batch_a_01")
+        reg.record("gemini-3.5-flash", {"thinking_level": "high"}, "batch_a_01")
 
         client = MultiTaskMockClient()
         result = batch_eval(
             repo_root=tmp_suite,
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3.5-flash",
             model_config={"thinking_level": "high"},
             client=client,
         )
@@ -208,14 +208,14 @@ class TestBatchEval:
         assert result["skipped"] == 1
         assert len(client.calls) == 0
         assert (tmp_suite / ".scratch/bench-suite/leaderboard.md").is_file()
-        assert "gemini-2.5-flash" in (
+        assert "gemini-3.5-flash" in (
             tmp_suite / ".scratch/bench-suite/leaderboard.md"
         ).read_text(encoding="utf-8")
 
     def test_empty_dataset(self, tmp_suite: Path) -> None:
         result = batch_eval(
             repo_root=tmp_suite,
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3.5-flash",
             model_config={"thinking_level": "high"},
             client=MultiTaskMockClient(),
         )

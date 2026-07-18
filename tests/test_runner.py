@@ -20,10 +20,10 @@ from bench_suite.runner import (
 def test_estimate_cost_usd() -> None:
     # 1M input + 1M output at flash rates
     cost = estimate_cost_usd(
-        "gemini-2.5-flash",
+        "gemini-3.5-flash",
         1_000_000,
         1_000_000,
-        pricing={"gemini-2.5-flash": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}},
+        pricing={"gemini-3.5-flash": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}},
     )
     assert cost == 0.75
 
@@ -64,13 +64,13 @@ def test_runner_applies_setup_and_model_files(tmp_path: Path, offline_fixture: d
     client = MockGeminiClient(text=response, input_tokens=1200, output_tokens=300)
     runner = Runner(
         client,
-        pricing={"gemini-2.5-flash": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}},
+        pricing={"gemini-3.5-flash": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}},
     )
     sandbox = tmp_path / "sandbox"
     result = runner.run(
         offline_fixture,
         sandbox,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.5-flash",
         model_config={"thinking_level": "high"},
     )
 
@@ -86,7 +86,7 @@ def test_runner_applies_setup_and_model_files(tmp_path: Path, offline_fixture: d
     assert result.execution["tool_calls"] == 1
     assert result.execution["cost_usd"] > 0
     assert result.execution["latency_seconds"] >= 0
-    assert client.calls[0]["model_name"] == "gemini-2.5-flash"
+    assert client.calls[0]["model_name"] == "gemini-3.5-flash"
     assert offline_fixture["prompt"] in client.calls[0]["prompt"]
     assert result.files_parsed is True
 
@@ -94,7 +94,7 @@ def test_runner_applies_setup_and_model_files(tmp_path: Path, offline_fixture: d
 def test_runner_registry_guard_blocks_api(tmp_path: Path, offline_fixture: dict) -> None:
     reg = Registry(tmp_path / "registry.json")
     cfg = {"thinking_level": "high"}
-    reg.record("gemini-2.5-flash", cfg, offline_fixture["task_id"])
+    reg.record("gemini-3.5-flash", cfg, offline_fixture["task_id"])
 
     client = MockGeminiClient(text="{}")
     runner = Runner(client)
@@ -102,7 +102,7 @@ def test_runner_registry_guard_blocks_api(tmp_path: Path, offline_fixture: dict)
         runner.run(
             offline_fixture,
             tmp_path / "sandbox",
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3.5-flash",
             model_config=cfg,
             registry=reg,
         )

@@ -18,7 +18,7 @@ from bench_suite.store import DatasetStore
 
 
 FAKE_EXECUTION = {
-    "model_name": "gemini-2.5-flash",
+    "model_name": "gemini-3.5-flash",
     "model_config": {"thinking_level": "high"},
     "input_tokens": 1000,
     "output_tokens": 200,

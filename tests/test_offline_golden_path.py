@@ -27,18 +27,18 @@ def test_offline_golden_path_end_to_end(tmp_suite: Path) -> None:
     )
     saved = store.load("offline_golden_01")
     assert len(saved["evaluation_results"]) == 1
-    assert saved["evaluation_results"][0]["model_name"] == "gemini-2.5-flash"
+    assert saved["evaluation_results"][0]["model_name"] == "gemini-3.5-flash"
 
     # Registry recorded
     reg = Registry(tmp_suite / ".scratch/bench-suite/registry.json")
-    assert reg.has_run("gemini-2.5-flash", {"thinking_level": "high"}, "offline_golden_01")
-    key = registry_key("gemini-2.5-flash", {"thinking_level": "high"})
+    assert reg.has_run("gemini-3.5-flash", {"thinking_level": "high"}, "offline_golden_01")
+    key = registry_key("gemini-3.5-flash", {"thinking_level": "high"})
     raw = json.loads((tmp_suite / ".scratch/bench-suite/registry.json").read_text(encoding="utf-8"))
     assert "offline_golden_01" in raw[key]
 
     # Dashboard outputs
     md = (tmp_suite / ".scratch/bench-suite/leaderboard.md").read_text(encoding="utf-8")
-    assert "gemini-2.5-flash" in md
+    assert "gemini-3.5-flash" in md
     assert "100.0%" in md
     html = (tmp_suite / ".scratch/bench-suite/index.html").read_text(encoding="utf-8")
     assert "chart.js@4.4.1" in html

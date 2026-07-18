@@ -92,7 +92,7 @@ def test_writes_leaderboard_and_html(tmp_path: Path) -> None:
             "task_id": "offline_golden_01",
             "evaluation_results": [
                 {
-                    "model_name": "gemini-2.5-flash",
+                    "model_name": "gemini-3.5-flash",
                     "model_config": {"thinking_level": "high"},
                     "completeness_percent": 100.0,
                     "cost_usd": 0.05,
@@ -110,7 +110,7 @@ def test_writes_leaderboard_and_html(tmp_path: Path) -> None:
     rows = gen.generate(tasks, leaderboard_path=md, html_path=html)
     assert rows[0]["rank"] == 1
     text = md.read_text(encoding="utf-8")
-    assert "gemini-2.5-flash" in text
+    assert "gemini-3.5-flash" in text
     assert "100.0%" in text
     html_text = html.read_text(encoding="utf-8")
     assert "chart.js@4.4.1" in html_text

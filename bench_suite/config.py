@@ -16,12 +16,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "json_sort_keys": True,
         "json_separators": [",", ":"],
     },
-    "llm_judge_reference_model": "gemini-2.0-flash",
+    # Fixed judge model — never the model under evaluation (conflict of interest).
+    # Prefer a cheap stable model distinct from default_model.
+    "llm_judge_reference_model": "gemini-3.1-flash-lite",
     "dynamic_growth_trigger": "manual",
     "chartjs_cdn": "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
-    "default_model": "gemini-2.5-flash",
+    # gemini-2.5-flash is no longer available to new API users (404 NOT_FOUND).
+    "default_model": "gemini-3.5-flash",
     "default_model_config": {"thinking_level": "high"},
-    "gemini_pricing": {**DEFAULT_PRICING, "default": {"input_per_mtok": 0.15, "output_per_mtok": 0.60}},
+    "gemini_pricing": {**DEFAULT_PRICING, "default": {"input_per_mtok": 0.25, "output_per_mtok": 1.50}},
     "paths": {
         "data_root": ".scratch/bench-suite",
         "schema": ".scratch/bench-suite/task-schema.json",

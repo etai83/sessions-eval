@@ -21,7 +21,7 @@ CORPUS_TASK_PATH = (
 )
 FIXTURE_GOLDEN = REPO_ROOT / ".scratch/bench-suite/fixtures/offline_golden_task.json"
 CORPUS_TASK_ID = "trading_btc_backtest_01"
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.5-flash"
 DEFAULT_CONFIG = {"thinking_level": "high"}
 
 

@@ -73,7 +73,7 @@ def test_live_run_success(tmp_suite: Path) -> None:
     client = _passing_client()
     result = run_live_task(
         repo_root=tmp_suite,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.5-flash",
         model_config={"thinking_level": "high"},
         client=client,
     )
@@ -94,10 +94,10 @@ def test_live_run_success(tmp_suite: Path) -> None:
     assert len(saved["evaluation_results"]) == 1
 
     reg = Registry(tmp_suite / ".scratch/bench-suite/registry.json")
-    assert reg.has_run("gemini-2.5-flash", {"thinking_level": "high"}, "offline_golden_01")
+    assert reg.has_run("gemini-3.5-flash", {"thinking_level": "high"}, "offline_golden_01")
 
     md = (tmp_suite / ".scratch/bench-suite/leaderboard.md").read_text(encoding="utf-8")
-    assert "gemini-2.5-flash" in md
+    assert "gemini-3.5-flash" in md
     html = (tmp_suite / ".scratch/bench-suite/index.html").read_text(encoding="utf-8")
     assert "chart.js@4.4.1" in html
 
@@ -106,7 +106,7 @@ def test_live_run_refuses_duplicate_before_api(tmp_suite: Path) -> None:
     client = _passing_client()
     run_live_task(
         repo_root=tmp_suite,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.5-flash",
         model_config={"thinking_level": "high"},
         client=client,
     )
@@ -116,7 +116,7 @@ def test_live_run_refuses_duplicate_before_api(tmp_suite: Path) -> None:
     with pytest.raises(AlreadyEvaluatedError, match="refusing live API call"):
         run_live_task(
             repo_root=tmp_suite,
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3.5-flash",
             model_config={"thinking_level": "high"},
             client=client2,
         )
@@ -149,8 +149,8 @@ def test_live_run_llm_judge_uses_reference_model(tmp_suite: Path) -> None:
     }
     client = RoutingMockClient(
         by_model={
-            "gemini-2.5-flash": json.dumps(runner_body),
-            "gemini-2.0-flash": '{"score": 0.95, "rationale": "natural sentence"}',
+            "gemini-3.5-flash": json.dumps(runner_body),
+            "gemini-3.1-flash-lite": '{"score": 0.95, "rationale": "natural sentence"}',
         },
         input_tokens=400,
         output_tokens=80,
@@ -159,7 +159,7 @@ def test_live_run_llm_judge_uses_reference_model(tmp_suite: Path) -> None:
     result = run_live_task(
         repo_root=tmp_suite,
         task_path=tmp_suite / ".scratch/bench-suite/fixtures" / LLM_JUDGE_DEMO.name,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.5-flash",
         model_config={"thinking_level": "high"},
         client=client,
     )
@@ -170,11 +170,11 @@ def test_live_run_llm_judge_uses_reference_model(tmp_suite: Path) -> None:
     assert result["evaluation_result"]["earned_roi"] == 15.0
 
     models_called = [c["model_name"] for c in client.calls]
-    assert "gemini-2.5-flash" in models_called  # runner
-    assert "gemini-2.0-flash" in models_called  # judge reference from config
+    assert "gemini-3.5-flash" in models_called  # runner
+    assert "gemini-3.1-flash-lite" in models_called  # judge reference from config
     # Second call is the judge: fixed reference model only
     assert len(client.calls) == 2
-    assert client.calls[1]["model_name"] == "gemini-2.0-flash"
+    assert client.calls[1]["model_name"] == "gemini-3.1-flash-lite"
     assert "Rubric" in client.calls[1]["prompt"]
 
     store = DatasetStore(
@@ -201,15 +201,15 @@ def test_live_run_llm_judge_fail_lowers_completeness(tmp_suite: Path) -> None:
     }
     client = RoutingMockClient(
         by_model={
-            "gemini-2.5-flash": json.dumps(runner_body),
-            "gemini-2.0-flash": '{"score": 0.2, "rationale": "placeholder-like"}',
+            "gemini-3.5-flash": json.dumps(runner_body),
+            "gemini-3.1-flash-lite": '{"score": 0.2, "rationale": "placeholder-like"}',
         }
     )
 
     result = run_live_task(
         repo_root=tmp_suite,
         task_path=tmp_suite / ".scratch/bench-suite/fixtures" / LLM_JUDGE_DEMO.name,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.5-flash",
         model_config={"thinking_level": "high"},
         client=client,
     )

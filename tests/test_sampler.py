@@ -223,7 +223,7 @@ class TestPromote:
         task = _minimal_task_entry("sw_feature_02", "bbbbbbbb-0000-4000-8000-000000000002")
         task["evaluation_results"] = [
             {
-                "model_name": "gemini-2.5-flash",
+                "model_name": "gemini-3.5-flash",
                 "model_config": {"thinking_level": "high"},
                 "completeness_percent": 100.0,
                 "input_tokens": 100,

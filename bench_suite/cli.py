@@ -41,11 +41,15 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Load TaskEntry from dataset/tasks by id (e.g. trading_btc_backtest_01)",
     )
-    live.add_argument("--model", default="gemini-2.5-flash")
+    live.add_argument(
+        "--model",
+        default=None,
+        help="Gemini model id (default: config default_model, currently gemini-3.5-flash)",
+    )
     live.add_argument(
         "--model-config",
-        default='{"thinking_level":"high"}',
-        help="JSON object for model_config",
+        default=None,
+        help='JSON object for model_config (default: config default_model_config)',
     )
     live.add_argument(
         "--force",
@@ -106,11 +110,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Live-eval every dataset task for one model×config; skip registry hits",
     )
     batch.add_argument("--repo-root", type=Path, default=None)
-    batch.add_argument("--model", default="gemini-2.5-flash")
+    batch.add_argument(
+        "--model",
+        default=None,
+        help="Gemini model id (default: config default_model)",
+    )
     batch.add_argument(
         "--model-config",
-        default='{"thinking_level":"high"}',
-        help="JSON object for model_config",
+        default=None,
+        help="JSON object for model_config (default: config default_model_config)",
     )
     batch.add_argument(
         "--force",
@@ -162,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "live-run":
-        model_config = json.loads(args.model_config)
+        model_config = json.loads(args.model_config) if args.model_config else None
         try:
             result = run_live_task(
                 repo_root=args.repo_root,
@@ -175,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         except AlreadyEvaluatedError as exc:
             print(str(exc), file=sys.stderr)
             return 1
-        except (ValueError, FileNotFoundError) as exc:
+        except (ValueError, FileNotFoundError, RuntimeError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
         print(json.dumps({k: v for k, v in result.items() if k != "model_response"}, indent=2))
@@ -244,13 +252,17 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "batch-eval":
-        model_config = json.loads(args.model_config)
-        result = batch_eval(
-            repo_root=args.repo_root,
-            model_name=args.model,
-            model_config=model_config,
-            force=args.force,
-        )
+        model_config = json.loads(args.model_config) if args.model_config else None
+        try:
+            result = batch_eval(
+                repo_root=args.repo_root,
+                model_name=args.model,
+                model_config=model_config,
+                force=args.force,
+            )
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         print(json.dumps(result, indent=2))
         print(
             f"\nBatch eval complete: ran={result['ran']} skipped={result['skipped']} "

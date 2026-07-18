@@ -12,7 +12,7 @@ from bench_suite.evaluator import Evaluator, strip_diagnostic_fields
 
 def _execution(**overrides):
     base = {
-        "model_name": "gemini-2.5-flash",
+        "model_name": "gemini-3.5-flash",
         "model_config": {"thinking_level": "high"},
         "input_tokens": 100,
         "output_tokens": 50,
@@ -111,8 +111,8 @@ def test_llm_judge_pass_when_score_meets_min(
 
     result = Evaluator(
         judge_client=judge,
-        judge_model="gemini-2.0-flash",
-    ).evaluate(task, sandbox, _execution(model_name="gemini-2.5-flash", cost_usd=0.10))
+        judge_model="gemini-3.1-flash-lite",
+    ).evaluate(task, sandbox, _execution(model_name="gemini-3.5-flash", cost_usd=0.10))
 
     assert result["completeness_percent"] == 100.0  # 4 of 4
     assert result["earned_roi"] == 10.0
@@ -120,7 +120,7 @@ def test_llm_judge_pass_when_score_meets_min(
     assert result["_total_rules"] == 4
     # Judge used reference model, not the model under evaluation
     assert len(judge.calls) == 1
-    assert judge.calls[0]["model_name"] == "gemini-2.0-flash"
+    assert judge.calls[0]["model_name"] == "gemini-3.1-flash-lite"
     assert "bench-suite" in judge.calls[0]["prompt"].lower() or "rubric" in judge.calls[0][
         "system_instruction"
     ].lower()
@@ -140,7 +140,7 @@ def test_llm_judge_fail_when_score_below_min(
 
     result = Evaluator(
         judge_client=judge,
-        judge_model="gemini-2.0-flash",
+        judge_model="gemini-3.1-flash-lite",
     ).evaluate(task, sandbox, _execution(cost_usd=0.20))
 
     assert result["completeness_percent"] == 75.0  # 3 of 4
@@ -164,14 +164,14 @@ def test_llm_judge_never_calls_model_under_evaluation(
 
     Evaluator(
         judge_client=judge,
-        judge_model="gemini-2.0-flash",
+        judge_model="gemini-3.1-flash-lite",
     ).evaluate(
         task,
         sandbox,
         _execution(model_name="gemini-2.5-pro"),
     )
 
-    assert judge.calls[0]["model_name"] == "gemini-2.0-flash"
+    assert judge.calls[0]["model_name"] == "gemini-3.1-flash-lite"
     assert judge.calls[0]["model_name"] != "gemini-2.5-pro"
 
 
@@ -186,7 +186,7 @@ def test_deterministic_only_unaffected_when_no_llm_judge(
 
     result = Evaluator(
         judge_client=judge,
-        judge_model="gemini-2.0-flash",
+        judge_model="gemini-3.1-flash-lite",
     ).evaluate(offline_fixture, sandbox, _execution(cost_usd=0.05))
 
     assert result["completeness_percent"] == 100.0
