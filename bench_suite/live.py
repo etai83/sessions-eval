@@ -8,10 +8,11 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-from bench_suite.config import load_config
+from bench_suite.config import load_config, resolve_run_review_caps
 from bench_suite.dashboard import DashboardGenerator
-from bench_suite.evaluator import Evaluator, strip_diagnostic_fields
+from bench_suite.evaluator import Evaluator
 from bench_suite.registry import Registry
+from bench_suite.run_review import attach_pack_to_result, write_run_review_pack
 from bench_suite.runner import (
     DEFAULT_PRICING,
     AlreadyEvaluatedError,
@@ -35,6 +36,8 @@ def run_live_task(
     client: GeminiClient | None = None,
     sandbox_dir: Path | None = None,
     force: bool = False,
+    review_cap_overrides: dict[str, int | None] | None = None,
+    review_caps_off: bool = False,
 ) -> dict[str, Any]:
     """
     End-to-end live path for one TaskEntry.
@@ -118,7 +121,26 @@ def run_live_task(
             run.execution,
             model_response=run.model_response,
         )
-        clean = strip_diagnostic_fields(result)
+        caps = resolve_run_review_caps(
+            config,
+            overrides=review_cap_overrides,
+            caps_off=review_caps_off,
+        )
+        hash_cfg = config.get("registry_hash") or {}
+        pack_info = write_run_review_pack(
+            task=task,
+            evaluation_result=result,
+            sandbox_root=sandbox,
+            model_response=run.model_response or "",
+            repo_root=root,
+            runs_root=Path(paths["runs"]),
+            runs_rel=str(config["paths"]["runs"]),
+            caps=caps,
+            files_parsed=bool(run.files_parsed),
+            files_written=list(run.files_written or []),
+            truncate_hex=int(hash_cfg.get("truncate_hex", 8)),
+        )
+        clean = attach_pack_to_result(result, pack_info)
 
         task = dict(task)
         task["evaluation_results"] = list(task.get("evaluation_results") or []) + [clean]
@@ -133,6 +155,8 @@ def run_live_task(
             store.list_tasks(),
             leaderboard_path=Path(paths["leaderboard"]),
             html_path=Path(paths["dashboard_html"]),
+            repo_root=root,
+            runs_rel=str(config["paths"]["runs"]),
         )
 
         return {
@@ -141,6 +165,8 @@ def run_live_task(
             "model_response": run.model_response,
             "files_written": run.files_written,
             "files_parsed": run.files_parsed,
+            "run_id": pack_info["run_id"],
+            "run_pack_path": pack_info["run_pack_path"],
             "skipped_duplicate": False,
             "leaderboard_rows": rows,
             "leaderboard_path": paths["leaderboard"],

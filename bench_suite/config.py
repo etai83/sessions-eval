@@ -34,8 +34,52 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "dashboard_html": ".scratch/bench-suite/index.html",
         "pending_review": ".scratch/bench-suite/pending-review",
         "classifier_rules": ".scratch/bench-suite/classifier_rules.json",
+        "runs": ".scratch/bench-suite/runs",
     },
 }
+
+DEFAULT_RUN_REVIEW_CAPS: dict[str, int] = {
+    "max_response_bytes": 1_048_576,
+    "max_file_bytes": 262_144,
+    "max_files": 100,
+    "max_pack_bytes": 8_388_608,
+}
+
+# Soft size caps for Run Review Pack write only (evaluation still sees full data).
+DEFAULT_CONFIG["run_review_caps"] = dict(DEFAULT_RUN_REVIEW_CAPS)
+
+
+def resolve_run_review_caps(
+    config: dict[str, Any] | None = None,
+    *,
+    overrides: dict[str, int | None] | None = None,
+    caps_off: bool = False,
+) -> dict[str, int | None]:
+    """
+    Effective pack soft-cap map.
+
+    Missing config keys fall back to defaults. ``caps_off`` forces all four to
+    ``null`` (no truncation). ``overrides`` replace individual keys.
+    """
+    if caps_off:
+        return {
+            "max_response_bytes": None,
+            "max_file_bytes": None,
+            "max_files": None,
+            "max_pack_bytes": None,
+        }
+    base = dict(DEFAULT_RUN_REVIEW_CAPS)
+    if config:
+        raw = config.get("run_review_caps") or {}
+        for key in DEFAULT_RUN_REVIEW_CAPS:
+            if key in raw and raw[key] is not None:
+                base[key] = int(raw[key])
+    if overrides:
+        for key, value in overrides.items():
+            if key not in DEFAULT_RUN_REVIEW_CAPS:
+                raise ValueError(f"Unknown run review cap: {key}")
+            base[key] = value if value is None else int(value)
+    return base  # type: ignore[return-value]
 
 
 def load_config(path: Path | None = None, *, repo_root: Path | None = None) -> dict[str, Any]:

@@ -13,9 +13,12 @@ def test_defaults_include_open_question_resolutions() -> None:
     assert DEFAULT_CONFIG["dynamic_growth_trigger"] == "manual"
     assert "chart.js@4.4.1" in DEFAULT_CONFIG["chartjs_cdn"]
     assert DEFAULT_CONFIG["registry_hash"]["truncate_hex"] == 8
+    assert DEFAULT_CONFIG["paths"]["runs"] == ".scratch/bench-suite/runs"
+    assert DEFAULT_CONFIG["run_review_caps"]["max_files"] == 100
 
 
 def test_load_config_resolves_paths(tmp_suite: Path) -> None:
     cfg = load_config(repo_root=tmp_suite)
     assert Path(cfg["_resolved_paths"]["dataset_tasks"]).is_dir()
     assert cfg["sandbox_isolation"] == "temp_dir"
+    assert "runs" in cfg["_resolved_paths"]

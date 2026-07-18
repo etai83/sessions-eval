@@ -172,7 +172,15 @@
           "latency_seconds":{ "type": "number", "description": "Wall-clock time from first token to final response" },
           "earned_roi":     { "type": "number", "description": "roi_value × (completeness_percent / 100)" },
           "cost_effectiveness_roi_per_usd": { "type": "number", "description": "earned_roi / cost_usd" },
-          "timestamp":      { "type": "string", "format": "date-time" }
+          "timestamp":      { "type": "string", "format": "date-time" },
+          "run_id": {
+            "type": "string",
+            "description": "Opaque run identity shared with the Run Review Pack directory and manifest (optional; omit on legacy metrics-only rows)"
+          },
+          "run_pack_path": {
+            "type": "string",
+            "description": "Repo-relative path to the Run Review Pack root, no trailing slash (optional; omit when no pack)"
+          }
         },
         "required": [
           "model_name", "model_config", "completeness_percent",

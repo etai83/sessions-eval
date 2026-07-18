@@ -9,10 +9,11 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-from bench_suite.config import load_config
+from bench_suite.config import load_config, resolve_run_review_caps
 from bench_suite.dashboard import DashboardGenerator
-from bench_suite.evaluator import Evaluator, strip_diagnostic_fields
+from bench_suite.evaluator import Evaluator
 from bench_suite.registry import Registry
+from bench_suite.run_review import attach_pack_to_result, write_run_review_pack
 from bench_suite.sandbox import apply_setup_steps
 from bench_suite.store import DatasetStore
 
@@ -44,11 +45,13 @@ def run_offline_golden_path(
     fixture_path: Path | None = None,
     sandbox_dir: Path | None = None,
     fake_execution: dict[str, Any] | None = None,
+    review_cap_overrides: dict[str, int | None] | None = None,
+    review_caps_off: bool = False,
 ) -> dict[str, Any]:
     """
     End-to-end offline path:
-    load fixture → validate → prepare sandbox → evaluate → save task →
-    record registry → generate dashboard.
+    load fixture → validate → prepare sandbox → evaluate → write pack →
+    save task → record registry → generate dashboard.
     """
     root = (repo_root or Path.cwd()).resolve()
     config = load_config(repo_root=root)
@@ -93,7 +96,25 @@ def run_offline_golden_path(
             result = evaluator.evaluate(
                 task, sandbox, execution, timestamp="2026-07-16T12:00:00Z"
             )
-            clean = strip_diagnostic_fields(result)
+            caps = resolve_run_review_caps(
+                config,
+                overrides=review_cap_overrides,
+                caps_off=review_caps_off,
+            )
+            pack_info = write_run_review_pack(
+                task=task,
+                evaluation_result=result,
+                sandbox_root=sandbox,
+                model_response="",
+                repo_root=root,
+                runs_root=Path(paths["runs"]),
+                runs_rel=str(config["paths"]["runs"]),
+                caps=caps,
+                files_parsed=True,
+                files_written=["output/summary.json"],
+                truncate_hex=int(hash_cfg.get("truncate_hex", 8)),
+            )
+            clean = attach_pack_to_result(result, pack_info)
             task = dict(task)
             task["evaluation_results"] = list(task.get("evaluation_results") or []) + [clean]
             store.save(task)
@@ -104,6 +125,8 @@ def run_offline_golden_path(
             store.list_tasks(),
             leaderboard_path=Path(paths["leaderboard"]),
             html_path=Path(paths["dashboard_html"]),
+            repo_root=root,
+            runs_rel=str(config["paths"]["runs"]),
         )
 
         return {

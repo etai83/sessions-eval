@@ -19,6 +19,8 @@ def test_offline_golden_path_end_to_end(tmp_suite: Path) -> None:
     assert er["completeness_percent"] == 100.0
     assert er["earned_roi"] == 10.0
     assert er["cost_effectiveness_roi_per_usd"] == 200.0  # 10 / 0.05
+    assert "run_id" in er
+    assert "run_pack_path" in er
 
     # Task persisted in dataset store
     store = DatasetStore(
@@ -28,6 +30,13 @@ def test_offline_golden_path_end_to_end(tmp_suite: Path) -> None:
     saved = store.load("offline_golden_01")
     assert len(saved["evaluation_results"]) == 1
     assert saved["evaluation_results"][0]["model_name"] == "gemini-3.5-flash"
+    # Run Review Pack pointer + on-disk pack
+    pack_dir = tmp_suite / saved["evaluation_results"][0]["run_pack_path"]
+    assert (pack_dir / "manifest.json").is_file()
+    assert (pack_dir / "response.txt").is_file()
+    assert (pack_dir / "files").is_dir()
+    # Review HTML pages
+    assert (tmp_suite / ".scratch/bench-suite/review/tasks/offline_golden_01.html").is_file()
 
     # Registry recorded
     reg = Registry(tmp_suite / ".scratch/bench-suite/registry.json")

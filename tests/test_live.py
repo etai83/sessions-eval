@@ -85,6 +85,10 @@ def test_live_run_success(tmp_suite: Path) -> None:
     assert result["evaluation_result"]["cost_usd"] > 0
     assert "output/summary.json" in result["files_written"]
     assert len(client.calls) == 1
+    assert "run_id" in result["evaluation_result"]
+    assert "run_pack_path" in result["evaluation_result"]
+    pack_dir = tmp_suite / result["evaluation_result"]["run_pack_path"]
+    assert (pack_dir / "manifest.json").is_file()
 
     store = DatasetStore(
         tmp_suite / ".scratch/bench-suite/dataset/tasks",
@@ -100,6 +104,42 @@ def test_live_run_success(tmp_suite: Path) -> None:
     assert "gemini-3.5-flash" in md
     html = (tmp_suite / ".scratch/bench-suite/index.html").read_text(encoding="utf-8")
     assert "chart.js@4.4.1" in html
+
+
+def test_force_rerun_appends_history_and_keeps_prior_pack(tmp_suite: Path) -> None:
+    client = _passing_client()
+    first = run_live_task(
+        repo_root=tmp_suite,
+        model_name="gemini-3.5-flash",
+        model_config={"thinking_level": "high"},
+        client=client,
+    )
+    first_pack = tmp_suite / first["evaluation_result"]["run_pack_path"]
+    first_manifest = (first_pack / "manifest.json").read_text(encoding="utf-8")
+
+    client2 = _passing_client()
+    second = run_live_task(
+        repo_root=tmp_suite,
+        model_name="gemini-3.5-flash",
+        model_config={"thinking_level": "high"},
+        client=client2,
+        force=True,
+    )
+    assert second["evaluation_result"]["run_id"] != first["evaluation_result"]["run_id"]
+    second_pack = tmp_suite / second["evaluation_result"]["run_pack_path"]
+    assert second_pack != first_pack
+    assert first_pack.is_dir()
+    assert (first_pack / "manifest.json").read_text(encoding="utf-8") == first_manifest
+    assert second_pack.is_dir()
+
+    store = DatasetStore(
+        tmp_suite / ".scratch/bench-suite/dataset/tasks",
+        tmp_suite / ".scratch/bench-suite/task-schema.json",
+    )
+    results = store.load("offline_golden_01")["evaluation_results"]
+    assert len(results) == 2
+    assert results[0]["run_id"] == first["evaluation_result"]["run_id"]
+    assert results[1]["run_id"] == second["evaluation_result"]["run_id"]
 
 
 def test_live_run_refuses_duplicate_before_api(tmp_suite: Path) -> None:

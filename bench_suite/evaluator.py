@@ -77,6 +77,28 @@ def parse_judge_score(text: str) -> float:
     return 0.0
 
 
+def parse_judge_rationale(text: str) -> str:
+    """Extract rationale string from judge JSON when present; else empty string."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return ""
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
+    if fence:
+        cleaned = fence.group(1).strip()
+    candidates = [cleaned]
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    if start >= 0 and end > start:
+        candidates.append(cleaned[start : end + 1])
+    for blob in candidates:
+        try:
+            data = json.loads(blob)
+            if isinstance(data, dict) and "rationale" in data:
+                return str(data["rationale"])
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+    return ""
+
+
 def _clamp01(value: float) -> float:
     if value < 0.0:
         return 0.0
@@ -116,24 +138,30 @@ class Evaluator:
     ) -> dict[str, Any]:
         sandbox_root = Path(sandbox_root)
         rules = task.get("validation_rules") or []
+        rule_outcomes: list[dict[str, Any]] = []
+        judges: list[dict[str, Any]] = []
+        judge_scores: list[float] = []
+
         if not rules:
             completeness = 100.0
             rules_passed = 0
             total_rules = 0
-            judge_scores: list[float] = []
         else:
-            results: list[bool] = []
-            judge_scores = []
-            for rule in rules:
+            for index, rule in enumerate(rules):
                 if rule.get("type") == "llm_judge":
-                    ok, score = self._check_llm_judge(
-                        rule, sandbox_root, model_response=model_response
+                    outcome, judge_entry = self._check_llm_judge_detailed(
+                        index, rule, sandbox_root, model_response=model_response
                     )
-                    results.append(ok)
+                    rule_outcomes.append(outcome)
+                    if judge_entry is not None:
+                        judges.append(judge_entry)
+                    score = float(outcome["detail"].get("score") or 0.0)
                     judge_scores.append(score)
                 else:
-                    results.append(self._check_rule(rule, sandbox_root))
-            rules_passed = sum(1 for ok in results if ok)
+                    rule_outcomes.append(
+                        self._check_rule_detailed(index, rule, sandbox_root)
+                    )
+            rules_passed = sum(1 for o in rule_outcomes if o["passed"])
             total_rules = len(rules)
             completeness = (rules_passed / total_rules) * 100.0
 
@@ -161,25 +189,39 @@ class Evaluator:
             "earned_roi": earned_roi,
             "cost_effectiveness_roi_per_usd": cost_effectiveness,
             "timestamp": ts,
-            # Diagnostic fields (not required by schema but useful in tests)
+            # Diagnostic fields (not required by schema but useful in tests / packs)
             "_rules_passed": rules_passed,
             "_total_rules": total_rules,
+            "_rule_outcomes": rule_outcomes,
+            "_judges": judges,
         }
         if judge_scores:
             out["_judge_scores"] = judge_scores
         return out
 
-    def _check_llm_judge(
+    def _check_llm_judge_detailed(
         self,
+        index: int,
         rule: dict[str, Any],
         sandbox_root: Path,
         *,
         model_response: str | None = None,
-    ) -> tuple[bool, float]:
-        """Return (passed, score). Score is 0.0 when the judge cannot run."""
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """Return (rule_outcome, judge_entry_or_None)."""
         min_score = float(rule.get("min_score", 0.7))
         if self.judge_client is None:
-            return False, 0.0
+            outcome = {
+                "index": index,
+                "type": "llm_judge",
+                "passed": False,
+                "detail": {
+                    "min_score": min_score,
+                    "score": 0.0,
+                    "judge_ran": False,
+                    "reason": "judge_unavailable",
+                },
+            }
+            return outcome, None
 
         artifact = self._artifact_for_judge(
             rule, sandbox_root, model_response=model_response
@@ -198,7 +240,46 @@ class Evaluator:
         )
         text = getattr(gen, "text", None) or str(gen)
         score = parse_judge_score(text)
-        return score >= min_score, score
+        rationale = parse_judge_rationale(text)
+        passed = score >= min_score
+        # judges_index filled by pack writer when assembling judge.json order;
+        # provisional index is len of judges so far — caller may rewrite.
+        judge_entry = {
+            "rule_index": index,
+            "score": score,
+            "min_score": min_score,
+            "passed": passed,
+            "rationale": rationale,
+            "raw_response": text,
+            "judge_model": self.judge_model,
+            "judge_model_config": dict(self.judge_model_config),
+        }
+        outcome = {
+            "index": index,
+            "type": "llm_judge",
+            "passed": passed,
+            "detail": {
+                "min_score": min_score,
+                "score": score,
+                "judge_ran": True,
+                # Placeholder; pack writer sets judges_index into final judges[].
+                "judges_index": 0,
+            },
+        }
+        return outcome, judge_entry
+
+    def _check_llm_judge(
+        self,
+        rule: dict[str, Any],
+        sandbox_root: Path,
+        *,
+        model_response: str | None = None,
+    ) -> tuple[bool, float]:
+        """Return (passed, score). Score is 0.0 when the judge cannot run."""
+        outcome, _ = self._check_llm_judge_detailed(
+            0, rule, sandbox_root, model_response=model_response
+        )
+        return bool(outcome["passed"]), float(outcome["detail"].get("score") or 0.0)
 
     def _artifact_for_judge(
         self,
@@ -254,29 +335,74 @@ class Evaluator:
             return text[:limit] + "\n… (truncated)"
         return text
 
+    def _check_rule_detailed(
+        self, index: int, rule: dict[str, Any], sandbox_root: Path
+    ) -> dict[str, Any]:
+        rule_type = rule.get("type", "unknown")
+        if rule_type == "file_exists":
+            path = str(rule.get("path") or "")
+            ok = self._resolve(path, sandbox_root).exists() if path else False
+            detail: dict[str, Any] = {"path": path}
+            if not ok:
+                detail["reason"] = "missing"
+            return {"index": index, "type": rule_type, "passed": ok, "detail": detail}
+
+        if rule_type == "file_contains":
+            path = str(rule.get("path") or "")
+            text = str(rule.get("text") or "")
+            detail = {"path": path, "text": text}
+            resolved = self._resolve(path, sandbox_root)
+            if not resolved.is_file():
+                detail["reason"] = "missing_file"
+                return {"index": index, "type": rule_type, "passed": False, "detail": detail}
+            try:
+                body = resolved.read_text(encoding="utf-8")
+            except OSError:
+                detail["reason"] = "unreadable"
+                return {"index": index, "type": rule_type, "passed": False, "detail": detail}
+            if text not in body:
+                detail["reason"] = "substring_missing"
+                return {"index": index, "type": rule_type, "passed": False, "detail": detail}
+            return {"index": index, "type": rule_type, "passed": True, "detail": detail}
+
+        if rule_type == "json_field_value":
+            path = str(rule.get("path") or "")
+            field = str(rule.get("field") or "")
+            expected = rule.get("expected")
+            detail = {"path": path, "field": field, "expected": expected}
+            resolved = self._resolve(path, sandbox_root)
+            if not resolved.is_file():
+                detail["reason"] = "missing_file"
+                return {"index": index, "type": rule_type, "passed": False, "detail": detail}
+            try:
+                data = json.loads(resolved.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError, UnicodeError):
+                detail["reason"] = "invalid_json"
+                return {"index": index, "type": rule_type, "passed": False, "detail": detail}
+            if not isinstance(data, dict) or field not in data:
+                detail["reason"] = "field_missing"
+                return {"index": index, "type": rule_type, "passed": False, "detail": detail}
+            actual = data[field]
+            if actual != expected:
+                detail["reason"] = "field_mismatch"
+                detail["actual"] = actual
+                return {"index": index, "type": rule_type, "passed": False, "detail": detail}
+            return {"index": index, "type": rule_type, "passed": True, "detail": detail}
+
+        # Unknown future rule types: fail closed with empty detail keys beyond type.
+        return {
+            "index": index,
+            "type": rule_type,
+            "passed": False,
+            "detail": {"reason": "unknown_rule_type"},
+        }
+
     def _check_rule(self, rule: dict[str, Any], sandbox_root: Path) -> bool:
         rule_type = rule["type"]
         if rule_type == "llm_judge":
-            # Prefer evaluate()'s _check_llm_judge path; fail closed if hit here without response
             ok, _ = self._check_llm_judge(rule, sandbox_root, model_response=None)
             return ok
-        if rule_type == "file_exists":
-            return self._resolve(rule["path"], sandbox_root).exists()
-        if rule_type == "file_contains":
-            path = self._resolve(rule["path"], sandbox_root)
-            if not path.is_file():
-                return False
-            return rule["text"] in path.read_text(encoding="utf-8")
-        if rule_type == "json_field_value":
-            path = self._resolve(rule["path"], sandbox_root)
-            if not path.is_file():
-                return False
-            data = json.loads(path.read_text(encoding="utf-8"))
-            try:
-                return data[rule["field"]] == rule["expected"]
-            except (KeyError, TypeError):
-                return False
-        raise ValueError(f"Unknown validation rule type: {rule_type}")
+        return bool(self._check_rule_detailed(0, rule, sandbox_root)["passed"])
 
     def _resolve(self, path_str: str, sandbox_root: Path) -> Path:
         path = Path(path_str)

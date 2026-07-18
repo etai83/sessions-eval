@@ -28,6 +28,13 @@
     "leaderboard": ".scratch/bench-suite/leaderboard.md",
     "dashboard_html": ".scratch/bench-suite/index.html",
     "pending_review": ".scratch/bench-suite/pending-review",
-    "classifier_rules": ".scratch/bench-suite/classifier_rules.json"
+    "classifier_rules": ".scratch/bench-suite/classifier_rules.json",
+    "runs": ".scratch/bench-suite/runs"
+  },
+  "run_review_caps": {
+    "max_response_bytes": 1048576,
+    "max_file_bytes": 262144,
+    "max_files": 100,
+    "max_pack_bytes": 8388608
   }
 }

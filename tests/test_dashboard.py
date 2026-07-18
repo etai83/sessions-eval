@@ -4,7 +4,83 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from bench_suite.dashboard import DashboardGenerator, aggregate_models
+from bench_suite.dashboard import (
+    DashboardGenerator,
+    aggregate_models,
+    select_latest,
+    select_latest_per_model_config,
+)
+
+
+def test_select_latest_by_timestamp_then_append_index() -> None:
+    results = [
+        {
+            "model_name": "m",
+            "model_config": {},
+            "timestamp": "2026-07-18T10:00:00Z",
+            "completeness_percent": 50.0,
+            "cost_usd": 0.1,
+            "earned_roi": 5.0,
+            "latency_seconds": 1.0,
+        },
+        {
+            "model_name": "m",
+            "model_config": {},
+            "timestamp": "2026-07-18T12:00:00Z",
+            "completeness_percent": 80.0,
+            "cost_usd": 0.2,
+            "earned_roi": 8.0,
+            "latency_seconds": 1.0,
+        },
+        {
+            "model_name": "m",
+            "model_config": {},
+            "timestamp": "2026-07-18T12:00:00Z",
+            "completeness_percent": 100.0,
+            "cost_usd": 0.3,
+            "earned_roi": 10.0,
+            "latency_seconds": 1.0,
+        },
+    ]
+    latest = select_latest(results, model_name="m", model_config={})
+    assert latest is not None
+    assert latest["completeness_percent"] == 100.0  # later append wins on equal timestamp
+    only = select_latest_per_model_config(results)
+    assert len(only) == 1
+    assert only[0]["completeness_percent"] == 100.0
+
+
+def test_aggregate_uses_latest_only() -> None:
+    tasks = [
+        {
+            "task_id": "t1",
+            "evaluation_results": [
+                {
+                    "model_name": "model-a",
+                    "model_config": {},
+                    "completeness_percent": 50.0,
+                    "cost_usd": 1.0,
+                    "earned_roi": 5.0,
+                    "latency_seconds": 1.0,
+                    "timestamp": "2026-07-18T10:00:00Z",
+                },
+                {
+                    "model_name": "model-a",
+                    "model_config": {},
+                    "completeness_percent": 100.0,
+                    "cost_usd": 0.10,
+                    "earned_roi": 10.0,
+                    "latency_seconds": 1.0,
+                    "timestamp": "2026-07-18T12:00:00Z",
+                },
+            ],
+        }
+    ]
+    rows = aggregate_models(tasks)
+    assert len(rows) == 1
+    assert rows[0]["avg_success_rate"] == 100.0
+    assert rows[0]["total_cost_usd"] == 0.10  # not 1.10
+    assert rows[0]["total_earned_roi"] == 10.0
 
 
 def test_lexicographic_ranking() -> None:
@@ -115,5 +191,17 @@ def test_writes_leaderboard_and_html(tmp_path: Path) -> None:
     html_text = html.read_text(encoding="utf-8")
     assert "chart.js@4.4.1" in html_text
     assert "successChart" in html_text
-    assert "per task × model" in html_text
+    assert "latest per task × model" in html_text
     assert "data-col=" in html_text
+    # Multi-page review surface
+    review = tmp_path / "review"
+    assert (review / "tasks" / "offline_golden_01.html").is_file()
+    assert (review / "models").is_dir()
+    model_pages = list((review / "models").glob("*.html"))
+    assert model_pages
+    run_pages = list((review / "runs").rglob("*.html"))
+    assert run_pages
+    # Missing pack callout for legacy metrics-only rows
+    legacy_html = run_pages[0].read_text(encoding="utf-8")
+    assert "Metrics only — no Run Review Pack" in legacy_html
+    assert "--force" in legacy_html

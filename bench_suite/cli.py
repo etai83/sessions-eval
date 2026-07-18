@@ -19,6 +19,20 @@ from bench_suite.pipeline import (
 )
 
 
+def _parse_review_caps(items: list[str] | None) -> dict[str, int]:
+    """Parse repeatable ``--review-cap key=value`` into a dict of int overrides."""
+    out: dict[str, int] = {}
+    for item in items or []:
+        if "=" not in item:
+            raise ValueError(f"Invalid --review-cap (expected key=value): {item!r}")
+        key, raw = item.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"Invalid --review-cap (empty key): {item!r}")
+        out[key] = int(raw.strip())
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="bench-suite", description="Antigravity Benchmarking Suite")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -55,6 +69,18 @@ def main(argv: list[str] | None = None) -> int:
         "--force",
         action="store_true",
         help="Re-run even if registry already has this pair (still appends a new result)",
+    )
+    live.add_argument(
+        "--review-cap",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Override a run_review_caps key for this invocation (repeatable)",
+    )
+    live.add_argument(
+        "--review-caps-off",
+        action="store_true",
+        help="Disable all Run Review Pack soft size caps for this invocation",
     )
 
     classify = sub.add_parser(
@@ -125,6 +151,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Re-run pairs already in the registry (still appends new results)",
     )
+    batch.add_argument(
+        "--review-cap",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Override a run_review_caps key for this invocation (repeatable)",
+    )
+    batch.add_argument(
+        "--review-caps-off",
+        action="store_true",
+        help="Disable all Run Review Pack soft size caps for this invocation",
+    )
 
     refresh = sub.add_parser(
         "refresh",
@@ -172,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "live-run":
         model_config = json.loads(args.model_config) if args.model_config else None
         try:
+            cap_overrides = _parse_review_caps(args.review_cap)
             result = run_live_task(
                 repo_root=args.repo_root,
                 task_path=args.task,
@@ -179,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
                 model_name=args.model,
                 model_config=model_config,
                 force=args.force,
+                review_cap_overrides=cap_overrides or None,
+                review_caps_off=bool(args.review_caps_off),
             )
         except AlreadyEvaluatedError as exc:
             print(str(exc), file=sys.stderr)
@@ -254,11 +295,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "batch-eval":
         model_config = json.loads(args.model_config) if args.model_config else None
         try:
+            cap_overrides = _parse_review_caps(args.review_cap)
             result = batch_eval(
                 repo_root=args.repo_root,
                 model_name=args.model,
                 model_config=model_config,
                 force=args.force,
+                review_cap_overrides=cap_overrides or None,
+                review_caps_off=bool(args.review_caps_off),
             )
         except RuntimeError as exc:
             print(str(exc), file=sys.stderr)

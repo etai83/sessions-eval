@@ -201,6 +201,8 @@ def batch_eval(
     model_config: dict[str, Any] | None = None,
     client: Any | None = None,
     force: bool = False,
+    review_cap_overrides: dict[str, int | None] | None = None,
+    review_caps_off: bool = False,
 ) -> dict[str, Any]:
     """
     Evaluate every dataset TaskEntry for one model × model_config.
@@ -252,6 +254,8 @@ def batch_eval(
                 model_config=model_config,
                 client=client,
                 force=force,
+                review_cap_overrides=review_cap_overrides,
+                review_caps_off=review_caps_off,
             )
             ran_ids.append(task_id)
         except AlreadyEvaluatedError:
@@ -269,6 +273,8 @@ def batch_eval(
         store.list_tasks(),
         leaderboard_path=Path(paths["leaderboard"]),
         html_path=Path(paths["dashboard_html"]),
+        repo_root=root,
+        runs_rel=str(config["paths"]["runs"]),
     )
 
     return {
