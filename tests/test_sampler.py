@@ -213,8 +213,10 @@ class TestPromote:
         with pytest.raises(FileExistsError, match="sw_feature_01"):
             sampler.promote(task, store=store)
 
-    def test_promote_does_not_strip_evaluation_results(self, tmp_path: Path) -> None:
-        """Promote accepts tasks that already have evaluation_results."""
+    def test_promote_saves_definition_without_evaluation_results(
+        self, tmp_path: Path
+    ) -> None:
+        """Promote is authoring: definition only; history is not co-saved."""
         tasks_dir = tmp_path / "dataset" / "tasks"
         tasks_dir.mkdir(parents=True)
         store = DatasetStore(tasks_dir, SCHEMA_PATH)
@@ -238,4 +240,5 @@ class TestPromote:
         ]
         path = sampler.promote(task, store=store)
         saved = json.loads(path.read_text())
-        assert len(saved["evaluation_results"]) == 1
+        assert "evaluation_results" not in saved
+        assert store.list_results("sw_feature_02") == []

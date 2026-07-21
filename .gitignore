@@ -8,6 +8,7 @@ venv/
 dist/
 build/
 .scratch/bench-suite/dataset/tasks/
+.scratch/bench-suite/dataset/results/
 .scratch/bench-suite/registry.json
 .scratch/bench-suite/leaderboard.md
 .scratch/bench-suite/index.html

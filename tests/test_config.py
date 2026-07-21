@@ -14,6 +14,7 @@ def test_defaults_include_open_question_resolutions() -> None:
     assert "chart.js@4.4.1" in DEFAULT_CONFIG["chartjs_cdn"]
     assert DEFAULT_CONFIG["registry_hash"]["truncate_hex"] == 8
     assert DEFAULT_CONFIG["paths"]["runs"] == ".scratch/bench-suite/runs"
+    assert DEFAULT_CONFIG["paths"]["dataset_results"] == ".scratch/bench-suite/dataset/results"
     assert DEFAULT_CONFIG["run_review_caps"]["max_files"] == 100
 
 

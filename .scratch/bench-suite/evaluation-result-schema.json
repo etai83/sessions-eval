@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EvaluationResult",
+  "description": "Thin per-run metrics row for dataset/results/<task_id>.jsonl (one object per line).",
+  "type": "object",
+  "properties": {
+    "model_name": { "type": "string" },
+    "model_config": {
+      "type": "object",
+      "description": "Provider-specific config (e.g. {thinking_level: high} for Gemini)",
+      "additionalProperties": true
+    },
+    "completeness_percent": {
+      "type": "number", "minimum": 0, "maximum": 100,
+      "description": "Fraction of validation_rules passed × 100"
+    },
+    "input_tokens": { "type": "integer" },
+    "output_tokens": { "type": "integer" },
+    "tool_calls": { "type": "integer" },
+    "cost_usd": { "type": "number" },
+    "latency_seconds": {
+      "type": "number",
+      "description": "Wall-clock time from first token to final response"
+    },
+    "earned_roi": {
+      "type": "number",
+      "description": "roi_value × (completeness_percent / 100)"
+    },
+    "cost_effectiveness_roi_per_usd": {
+      "type": "number",
+      "description": "earned_roi / cost_usd"
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "run_id": {
+      "type": "string",
+      "description": "Opaque run identity shared with the Run Review Pack directory and manifest (optional; omit on legacy metrics-only rows)"
+    },
+    "run_pack_path": {
+      "type": "string",
+      "description": "Repo-relative path to the Run Review Pack root, no trailing slash (optional; omit when no pack)"
+    }
+  },
+  "required": [
+    "model_name", "model_config", "completeness_percent",
+    "input_tokens", "output_tokens", "tool_calls",
+    "cost_usd", "latency_seconds", "earned_roi",
+    "cost_effectiveness_roi_per_usd", "timestamp"
+  ]
+}

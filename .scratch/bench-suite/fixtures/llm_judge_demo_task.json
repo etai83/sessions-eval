@@ -1,33 +1,26 @@
 {
   "task_id": "llm_judge_demo_01",
   "name": "Demo — deterministic summary JSON + llm_judge quality gate",
-
   "taxonomy": {
     "output_type": "code",
     "complexity": "single_step",
     "intent": "generate"
   },
-
   "domain": {
     "category": "General",
     "subcategory": "Miscellaneous"
   },
-
   "source": {
     "conversation_id": "00000000-0000-4000-8000-000000000014",
     "transcript_path": "/dev/null",
     "timestamp": "2026-07-17T00:00:00Z"
   },
-
   "prompt": "Write output/summary.json with status ok and a greeting containing Hello bench-suite. The greeting should read as a natural, complete sentence.",
-
   "required_tools": [],
   "required_skills": [],
-
   "roi_value": 15.0,
   "target_token_budget": 1500,
   "target_tool_call_budget": 5,
-
   "setup_steps": [
     {
       "action": "write_file",
@@ -35,7 +28,6 @@
       "content": "seed"
     }
   ],
-
   "validation_rules": [
     {
       "type": "file_exists",
@@ -58,7 +50,5 @@
       "rubric": "The greeting field is a natural, complete English sentence that mentions the bench-suite and does not look like placeholder or lorem ipsum text.",
       "min_score": 0.7
     }
-  ],
-
-  "evaluation_results": []
+  ]
 }

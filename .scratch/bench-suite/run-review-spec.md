@@ -226,7 +226,7 @@ Colon in `model_key` matches the registry (POSIX). If a platform forbids `:`, en
 
 ### 4.3 EvaluationResult fields
 
-Add two **optional** properties to `evaluation_results[]` items in `task-schema.json` (not in `required` — legacy rows stay valid):
+Evaluation history lives in `dataset/results/<task_id>.jsonl` (one JSON object per line), not inside the TaskEntry definition file. Each row may include two **optional** pack pointers (omit both on legacy metrics-only rows):
 
 | Field | Type | Meaning |
 |---|---|---|

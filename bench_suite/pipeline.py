@@ -88,16 +88,13 @@ def promote_task(
     """
     from bench_suite.config import load_config
     from bench_suite.sampler import Sampler
-    from bench_suite.store import DatasetStore
+    from bench_suite.store import dataset_store_from_paths
 
     root = (Path(repo_root) if repo_root else Path.cwd()).resolve()
     config = load_config(repo_root=root)
     paths = config["_resolved_paths"]
 
-    store = DatasetStore(
-        Path(paths["dataset_tasks"]),
-        Path(paths["schema"]),
-    )
+    store = dataset_store_from_paths(paths)
 
     with Path(pending_path).open(encoding="utf-8") as f:
         task = json.load(f)
@@ -136,7 +133,7 @@ def refresh_corpus(
       new candidates are selected.
     """
     from bench_suite.config import load_config
-    from bench_suite.store import DatasetStore
+    from bench_suite.store import dataset_store_from_paths
 
     root = (Path(repo_root) if repo_root else Path.cwd()).resolve()
     config = load_config(repo_root=root)
@@ -157,7 +154,7 @@ def refresh_corpus(
         seen_paths.add(resolved)
         unique_paths.append(p)
 
-    store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
+    store = dataset_store_from_paths(paths)
     existing_tasks = store.list_tasks()
     existing_ids = {
         t["source"]["conversation_id"] for t in existing_tasks if t.get("source")
@@ -216,7 +213,7 @@ def batch_eval(
     from bench_suite.live import run_live_task
     from bench_suite.registry import Registry
     from bench_suite.runner import AlreadyEvaluatedError
-    from bench_suite.store import DatasetStore
+    from bench_suite.store import dataset_store_from_paths
 
     root = (Path(repo_root) if repo_root else Path.cwd()).resolve()
     config = load_config(repo_root=root)
@@ -228,7 +225,7 @@ def batch_eval(
         else (config.get("default_model_config") or {"thinking_level": "high"})
     )
 
-    store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
+    store = dataset_store_from_paths(paths)
     hash_cfg = config.get("registry_hash") or {}
     registry = Registry(
         Path(paths["registry"]),

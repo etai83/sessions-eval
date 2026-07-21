@@ -95,9 +95,13 @@ def _setup_suite_with_tasks(tmp_suite: Path, tasks: list[dict]) -> DatasetStore:
     store = DatasetStore(
         tmp_suite / ".scratch/bench-suite/dataset/tasks",
         tmp_suite / ".scratch/bench-suite/task-schema.json",
+        results_dir=tmp_suite / ".scratch/bench-suite/dataset/results",
     )
     for task in tasks:
+        results = list(task.get("evaluation_results") or [])
         store.save(task)
+        for row in results:
+            store.append_result(task["task_id"], row)
     return store
 
 

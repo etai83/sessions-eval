@@ -47,9 +47,10 @@
                     │  4. DATASET STORE           │
                     │  .scratch/bench-suite/       │
                     │    dataset/                  │
-                    │      tasks/<task_id>.json    │  ← one file per task
+                    │      tasks/<task_id>.json    │  ← definition only
+                    │      results/<task_id>.jsonl │  ← append-only history
                     │    registry.json             │  ← model × task run log
-                    │    task-schema.json          │  ← canonical schema
+                    │    task-schema.json          │  ← definition schema
                     └────────┬────────────────────┘
                              │
                ┌─────────────┴──────────────┐
@@ -80,13 +81,13 @@
    │  earned_roi         │  = roi_value × (completeness_% / 100)
    │  cost_effectiveness │  = earned_roi / cost_usd
    └────────┬────────────┘
-            │  EvaluationResult appended to task file
+            │  EvaluationResult appended to results/<task_id>.jsonl
             │  Registry updated: model × task_id = done
             ▼
    ┌─────────────────────┐
    │  8. DASHBOARD GEN   │
-   │  reads all task     │
-   │  evaluation_results │
+   │  reads joined task  │
+   │  evaluation history │
    │  → leaderboard.md   │  (Markdown table, ranked)
    │  → index.html       │  (static HTML with charts)
    └─────────────────────┘
@@ -126,11 +127,11 @@
 ### 4. Dataset Store
 | Property | Value |
 |---|---|
-| **Location** | `.scratch/bench-suite/dataset/tasks/<task_id>.json` |
-| **Format** | One JSON file per task, conforming to `task-schema.json` |
-| **Schema** | [task-schema.json](./task-schema.json) |
-| **Mutability** | `evaluation_results[]` grows on each run; all other fields are immutable after authoring |
-| **Owns** | Ground truth; canonical source for all downstream components |
+| **Location** | Definitions: `.scratch/bench-suite/dataset/tasks/<task_id>.json`; history: `.scratch/bench-suite/dataset/results/<task_id>.jsonl` |
+| **Format** | One definition JSON per task (`task-schema.json`); one JSONL of EvaluationResult rows per task |
+| **Schema** | [task-schema.json](./task-schema.json) (definition); result rows validated by DatasetStore |
+| **Mutability** | Definitions immutable after authoring; results JSONL append-only on each run |
+| **Owns** | Ground truth definitions + evaluation history; join at read time for ranking/dashboard |
 
 ### 5. Runner
 | Property | Value |
@@ -145,7 +146,7 @@
 | Property | Value |
 |---|---|
 | **Input** | Model response + `TaskEntry.validation_rules` + runner's execution record |
-| **Output** | `EvaluationResult` object appended to `task.evaluation_results[]` |
+| **Output** | `EvaluationResult` object appended to `dataset/results/<task_id>.jsonl` |
 | **Rule engine** | `file_exists` → `os.path.exists`; `file_contains` → substring check; `json_field_value` → JSON parse + key compare; `llm_judge` → Gemini API call with rubric, returns 0.0–1.0 |
 | **Score** | `completeness_percent = (rules_passed / total_rules) × 100`; llm_judge counts as pass if score ≥ `min_score` |
 | **Owns** | DoD verification and score computation |
@@ -179,7 +180,7 @@ Transcripts → [Ingester] → [Classifier] → [Sampler] → human authors DoD
                                                               ↓
                                           [Registry check] → [Runner] → [Evaluator]
                                                                               ↓
-                                                           task file updated (evaluation_results++)
+                                                           results JSONL appended (evaluation history)
                                                            registry.json updated
                                                               ↓
                                                     [Dashboard Generator]

@@ -20,7 +20,7 @@ from bench_suite.runner import (
     GoogleGenaiClient,
     Runner,
 )
-from bench_suite.store import DatasetStore
+from bench_suite.store import dataset_store_from_paths
 
 # Re-export for CLI/tests
 __all__ = ["AlreadyEvaluatedError", "run_live_task"]
@@ -60,7 +60,7 @@ def run_live_task(
         else (config.get("default_model_config") or {"thinking_level": "high"})
     )
 
-    store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
+    store = dataset_store_from_paths(paths)
     if task_id and task_path:
         raise ValueError("Pass only one of task_id or task_path, not both")
     if task_id:
@@ -142,9 +142,9 @@ def run_live_task(
         )
         clean = attach_pack_to_result(result, pack_info)
 
-        task = dict(task)
-        task["evaluation_results"] = list(task.get("evaluation_results") or []) + [clean]
-        store.save(task)
+        if not store.task_path(task["task_id"]).is_file():
+            store.save(task)
+        store.append_result(task["task_id"], clean)
         if not registry.has_run(model_name, model_config, task["task_id"]):
             registry.record(model_name, model_config, task["task_id"])
         elif force:

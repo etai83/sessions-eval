@@ -258,11 +258,8 @@ def main(argv: list[str] | None = None) -> int:
         from bench_suite.config import load_config
         config = load_config(repo_root=root)
         paths = config["_resolved_paths"]
-        from bench_suite.store import DatasetStore
-        store = DatasetStore(
-            Path(paths["dataset_tasks"]),
-            Path(paths["schema"]),
-        )
+        from bench_suite.store import dataset_store_from_paths
+        store = dataset_store_from_paths(paths)
         existing_ids = {t["source"]["conversation_id"] for t in store.list_tasks()}
         result = sample_and_write_pending(
             args.transcripts,

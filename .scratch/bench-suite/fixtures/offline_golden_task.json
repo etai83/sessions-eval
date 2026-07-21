@@ -1,33 +1,26 @@
 {
   "task_id": "offline_golden_01",
   "name": "Offline Golden Path Fixture — write summary JSON",
-
   "taxonomy": {
     "output_type": "code",
     "complexity": "single_step",
     "intent": "generate"
   },
-
   "domain": {
     "category": "General",
     "subcategory": "Miscellaneous"
   },
-
   "source": {
     "conversation_id": "00000000-0000-4000-8000-000000000001",
     "transcript_path": "/dev/null",
     "timestamp": "2026-07-16T00:00:00Z"
   },
-
   "prompt": "Write output/summary.json with status ok and a greeting containing Hello bench-suite.",
-
   "required_tools": [],
   "required_skills": [],
-
   "roi_value": 10.0,
   "target_token_budget": 1000,
   "target_tool_call_budget": 5,
-
   "setup_steps": [
     {
       "action": "write_file",
@@ -35,7 +28,6 @@
       "content": "seed"
     }
   ],
-
   "validation_rules": [
     {
       "type": "file_exists",
@@ -52,7 +44,5 @@
       "field": "status",
       "expected": "ok"
     }
-  ],
-
-  "evaluation_results": []
+  ]
 }

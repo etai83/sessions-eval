@@ -15,7 +15,7 @@ from bench_suite.evaluator import Evaluator
 from bench_suite.registry import Registry
 from bench_suite.run_review import attach_pack_to_result, write_run_review_pack
 from bench_suite.sandbox import apply_setup_steps
-from bench_suite.store import DatasetStore
+from bench_suite.store import dataset_store_from_paths
 
 
 FAKE_EXECUTION = {
@@ -57,7 +57,7 @@ def run_offline_golden_path(
     config = load_config(repo_root=root)
     paths = config["_resolved_paths"]
 
-    store = DatasetStore(Path(paths["dataset_tasks"]), Path(paths["schema"]))
+    store = dataset_store_from_paths(paths)
     fixture = Path(fixture_path) if fixture_path else root / ".scratch/bench-suite/fixtures/offline_golden_task.json"
     task = store.load_path(fixture)
 
@@ -115,9 +115,9 @@ def run_offline_golden_path(
                 truncate_hex=int(hash_cfg.get("truncate_hex", 8)),
             )
             clean = attach_pack_to_result(result, pack_info)
-            task = dict(task)
-            task["evaluation_results"] = list(task.get("evaluation_results") or []) + [clean]
-            store.save(task)
+            if not store.task_path(task["task_id"]).is_file():
+                store.save(task)
+            store.append_result(task["task_id"], clean)
             registry.record(execution["model_name"], execution["model_config"], task["task_id"])
 
         dash = DashboardGenerator(chartjs_cdn=config["chartjs_cdn"])

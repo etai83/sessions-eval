@@ -24,6 +24,7 @@
     "data_root": ".scratch/bench-suite",
     "schema": ".scratch/bench-suite/task-schema.json",
     "dataset_tasks": ".scratch/bench-suite/dataset/tasks",
+    "dataset_results": ".scratch/bench-suite/dataset/results",
     "registry": ".scratch/bench-suite/registry.json",
     "leaderboard": ".scratch/bench-suite/leaderboard.md",
     "dashboard_html": ".scratch/bench-suite/index.html",

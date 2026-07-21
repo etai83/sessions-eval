@@ -92,7 +92,9 @@ def suite_with_corpus_task(tmp_suite: Path) -> Path:
     # Also seed golden into dataset so multi-task aggregation is exercisable
     store = _store(tmp_suite)
     golden = json.loads(FIXTURE_GOLDEN.read_text(encoding="utf-8"))
-    golden["evaluation_results"] = [
+    store.save(golden)
+    store.append_result(
+        golden["task_id"],
         {
             "model_name": DEFAULT_MODEL,
             "model_config": dict(DEFAULT_CONFIG),
@@ -105,9 +107,8 @@ def suite_with_corpus_task(tmp_suite: Path) -> Path:
             "earned_roi": 10.0,
             "cost_effectiveness_roi_per_usd": 200.0,
             "timestamp": "2026-07-16T12:00:00Z",
-        }
-    ]
-    store.save(golden)
+        },
+    )
     return tmp_suite
 
 
@@ -121,7 +122,7 @@ class TestCorpusTaskArtifact:
         assert task["task_id"] == CORPUS_TASK_ID
         assert task["source"]["conversation_id"] == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         assert task["task_id"] != "offline_golden_01"
-        assert task["evaluation_results"] == []
+        assert "evaluation_results" not in task
         assert task["validation_rules"]
         assert task["roi_value"] > 0
         assert task["setup_steps"]

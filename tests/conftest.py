@@ -36,12 +36,16 @@ def tmp_suite(tmp_path: Path, schema_path: Path) -> Path:
     data = tmp_path / ".scratch" / "bench-suite"
     data.mkdir(parents=True)
     shutil.copy(schema_path, data / "task-schema.json")
+    result_schema = REPO_ROOT / ".scratch/bench-suite/evaluation-result-schema.json"
+    if result_schema.is_file():
+        shutil.copy(result_schema, data / "evaluation-result-schema.json")
     with CONFIG_PATH.open(encoding="utf-8") as f:
         config = json.load(f)
     # Paths stay relative; load_config resolves against repo_root=tmp_path
     with (data / "config.json").open("w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
     (data / "dataset" / "tasks").mkdir(parents=True)
+    (data / "dataset" / "results").mkdir(parents=True)
     (data / "fixtures").mkdir(parents=True)
     shutil.copy(FIXTURE_PATH, data / "fixtures" / "offline_golden_task.json")
     return tmp_path

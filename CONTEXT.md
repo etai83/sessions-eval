@@ -5,11 +5,11 @@ Flat-file evaluation of Gemini models on TaskEntries derived from Antigravity se
 ## Language
 
 **TaskEntry**:
-A single benchmark task: prompt, setup, validation rules, and appended evaluation results.
-_Avoid_: task file, benchmark case (when referring to the full JSON record)
+A single benchmark task **definition**: identity, taxonomy, prompt, setup steps, validation rules, budgets, and provenance. Stored under `dataset/tasks/<task_id>.json`. Does not own evaluation history.
+_Avoid_: task file, benchmark case (when referring only to scores), result row
 
 **EvaluationResult**:
-The thin per-run metrics record appended to a TaskEntry (scores, tokens, cost, latency, timestamp) — not the full review artifacts. When a Run Review Pack was written, it also carries the run id and a thin path pointer to that pack.
+The thin per-run metrics record (scores, tokens, cost, latency, timestamp) — not the full review artifacts. When a Run Review Pack was written, it also carries the run id and a thin path pointer to that pack. History is append-only under `dataset/results/<task_id>.jsonl` and joined at read time for ranking/dashboard.
 _Avoid_: run result (ambiguous with Run Review Pack), score row
 
 **Run Review Pack**:
