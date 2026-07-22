@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PROTOTYPE — Session Review UX</title>
+  <!--
+    PROTOTYPE (throwaway): answers wayfinder #17 —
+    "Does a cheap static HTML mock of the two list sections plus one conversation
+     detail and one session-log detail feel right for review workflow?"
+
+    Three structural variants via ?variant=A|B|C (or bottom bar / ← →).
+    Fixture data only — not full corpus. List columns from #13; detail layout from #14;
+    output layout from #15. Not production. Do not fold into SessionReviewGenerator as-is.
+
+    Open: open .scratch/bench-suite/prototype-session-review.html
+       or: python -m http.server -d .scratch/bench-suite 8765  then /prototype-session-review.html
+  -->
+  <style>
+    :root {
+      --bg: #f8fafc; --card: #fff; --ink: #0f172a; --muted: #64748b;
+      --line: #e2e8f0; --accent: #0284c7; --ok: #15803d; --bad: #b91c1c;
+      --warn: #b45309; --chip: #e0f2fe; --soft: #f1f5f9;
+      --outcome: #ecfdf5; --outcome-border: #6ee7b7;
+      --unlinked: #ffedd5; --unlinked-ink: #9a3412;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+    a { color: var(--accent); cursor: pointer; }
+    a.fake { text-decoration: underline; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+    .proto-banner {
+      background: #7c2d12; color: #fff7ed; padding: 0.5rem 1rem; font-size: 0.85rem;
+    }
+    .proto-banner strong { color: #fdba74; }
+    .chip {
+      display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em;
+      padding: 0.1rem 0.45rem; border-radius: 999px; vertical-align: middle; white-space: nowrap;
+    }
+    .chip.linked { background: #dcfce7; color: var(--ok); }
+    .chip.unlinked { background: var(--unlinked); color: var(--unlinked-ink); }
+    .chip.artifact { background: var(--chip); color: #075985; }
+    .chip.muted { background: var(--soft); color: var(--muted); }
+    table { border-collapse: collapse; width: 100%; background: var(--card); }
+    th, td { border: 1px solid var(--line); padding: 0.45rem 0.65rem; text-align: left; font-size: 0.88rem; vertical-align: top; }
+    th { background: #f1f5f9; cursor: default; user-select: none; }
+    th.sortable { cursor: pointer; }
+    th.sortable:hover { background: #e2e8f0; }
+    .crumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .crumb a { text-decoration: none; }
+    .crumb a:hover { text-decoration: underline; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.4rem; }
+    h2 { font-size: 1.05rem; margin: 1.25rem 0 0.5rem; }
+    h3 { font-size: 0.95rem; margin: 0.85rem 0 0.35rem; color: #334155; }
+    p.sub { color: var(--muted); margin: 0 0 1rem; font-size: 0.9rem; }
+    .path-hint { color: var(--muted); font-size: 0.8rem; }
+    .screen { display: none; padding: 1.25rem 1.5rem 5.5rem; max-width: 1100px; margin: 0 auto; }
+    .screen.active { display: block; }
+    .nav-mock { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0 1rem; }
+    .nav-mock button {
+      border: 1px solid var(--line); background: var(--card); padding: 0.35rem 0.7rem;
+      border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+    }
+    .nav-mock button.on { border-color: var(--accent); background: var(--chip); color: #075985; }
+    .hub-links {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.25rem 0;
+    }
+    .hub-card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+      padding: 1.1rem 1.25rem; text-decoration: none; color: inherit; display: block;
+      cursor: pointer; text-align: left; font: inherit; width: 100%;
+    }
+    .hub-card:hover { border-color: var(--accent); background: #f0f9ff; }
+    .hub-card h2 { margin: 0 0 0.35rem; color: var(--accent); }
+    .outcome-band {
+      background: var(--outcome); border: 1px solid var(--outcome-border);
+      border-radius: 10px; padding: 0.85rem 1rem; margin: 0.85rem 0 1rem;
+    }
+    .outcome-band.missing {
+      background: #fffbeb; border-color: #fcd34d;
+    }
+    .outcome-band .label {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #047857; margin-bottom: 0.35rem;
+    }
+    .outcome-band.missing .label { color: var(--warn); }
+    .step {
+      background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+      padding: 0.55rem 0.75rem; margin: 0.4rem 0;
+    }
+    .step .who { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+    .step.user { border-left: 3px solid #38bdf8; }
+    .step.planner { border-left: 3px solid #a78bfa; }
+    .step.tool { border-left: 3px solid #34d399; }
+    .md-body {
+      background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+      padding: 1rem 1.15rem; line-height: 1.55;
+    }
+    .md-body h2 { margin-top: 1rem; }
+    .md-body ul { margin: 0.35rem 0 0.35rem 1.2rem; }
+    details.raw {
+      margin-top: 1rem; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--card); padding: 0.5rem 0.75rem;
+    }
+    details.raw summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+    pre.block {
+      background: #0f172a; color: #e2e8f0; padding: 0.75rem; border-radius: 8px;
+      overflow: auto; max-height: 14rem; white-space: pre-wrap; font-size: 0.8rem;
+    }
+    .header-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.35rem 0 0.5rem; }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover td { background: #f0f9ff; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+
+    /* —— Variant B: master-detail —— */
+    .vB-shell {
+      display: grid; grid-template-columns: minmax(280px, 38%) 1fr;
+      min-height: calc(100vh - 3rem); max-width: 1280px; margin: 0 auto; padding: 0 0 5rem;
+    }
+    .vB-side {
+      background: var(--card); border-right: 1px solid var(--line);
+      display: flex; flex-direction: column; max-height: calc(100vh - 3rem);
+    }
+    .vB-tabs { display: flex; border-bottom: 1px solid var(--line); }
+    .vB-tabs button {
+      flex: 1; border: 0; background: var(--soft); padding: 0.65rem; cursor: pointer;
+      font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--muted);
+    }
+    .vB-tabs button.on { background: var(--card); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+    .vB-list { overflow: auto; flex: 1; }
+    .vB-row {
+      display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line);
+      background: var(--card); padding: 0.7rem 0.85rem; cursor: pointer; font: inherit; color: inherit;
+    }
+    .vB-row:hover, .vB-row.on { background: #f0f9ff; }
+    .vB-row strong { display: block; font-size: 0.9rem; }
+    .vB-row small { color: var(--muted); font-size: 0.75rem; }
+    .vB-main { padding: 1.15rem 1.35rem; overflow: auto; max-height: calc(100vh - 3rem); }
+
+    /* —— Variant C: pair-centric —— */
+    .vC-wrap { max-width: 1180px; margin: 0 auto; padding: 1.25rem 1.5rem 5.5rem; }
+    .vC-pair {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+      border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+      background: var(--card); margin: 0.65rem 0; cursor: pointer;
+    }
+    .vC-pair:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .vC-pair.on { border-color: var(--accent); box-shadow: 0 0 0 2px #bae6fd; }
+    .vC-half { padding: 0.85rem 1rem; }
+    .vC-half + .vC-half { border-left: 1px solid var(--line); }
+    .vC-half .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 700; }
+    .vC-orphan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem; }
+    .vC-stack {
+      border: 1px dashed var(--line); border-radius: 10px; background: #fff;
+      padding: 0.5rem;
+    }
+    .vC-stack h3 { margin: 0.35rem 0.5rem 0.5rem; }
+    .vC-stack .item {
+      display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line);
+      background: transparent; padding: 0.55rem 0.5rem; cursor: pointer; font: inherit;
+    }
+    .vC-stack .item:last-child { border-bottom: 0; }
+    .vC-stack .item:hover, .vC-stack .item.on { background: #f0f9ff; border-radius: 6px; }
+    .vC-detail {
+      margin-top: 1.25rem; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--card); padding: 1rem 1.15rem;
+    }
+    .vC-dual { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .vC-dual > div { border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem; background: var(--bg); }
+
+    .switcher {
+      position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 0.5rem;
+      background: #0f172a; color: #f8fafc; padding: 0.45rem 0.75rem; border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(15,23,42,0.35); z-index: 50; font-size: 0.85rem;
+    }
+    .switcher button {
+      background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 999px;
+      width: 2rem; height: 2rem; cursor: pointer; font-size: 1rem;
+    }
+    .switcher .label { min-width: 16rem; text-align: center; }
+    .switcher .label small { display: block; color: #94a3b8; font-size: 0.7rem; }
+    .state-dump {
+      margin-top: 1.5rem; padding: 0.65rem 0.85rem; background: #0f172a; color: #94a3b8;
+      border-radius: 8px; font-size: 0.75rem; font-family: ui-monospace, Menlo, monospace;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 860px) {
+      .hub-links, .vB-shell, .vC-pair, .vC-orphan-grid, .vC-dual { grid-template-columns: 1fr; }
+      .vC-half + .vC-half { border-left: 0; border-top: 1px solid var(--line); }
+      .vB-shell { min-height: auto; }
+      .vB-side, .vB-main { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="proto-banner">
+    <strong>PROTOTYPE / throwaway</strong> — Session Review UX (#17). Fixture data only.
+    Question: do two list sections + conversation detail + session-log detail feel right for review?
+    Flip variants with the bar below or <code>?variant=A|B|C</code> / ← →.
+  </div>
+
+  <!-- ===================== VARIANT A: multi-page two-section drill-down ===================== -->
+  <div id="variant-A" class="variant" hidden>
+    <div style="padding:0.75rem 1.5rem 0;max-width:1100px;margin:0 auto">
+      <p class="sub" style="margin:0.5rem 0">
+        <strong>A — Multi-page section drill-down</strong> (matches #13/#14/#15).
+        Simulated pages under <code>sessions/</code> + <code>session-logs/</code>; nav mirrors static HTML generation.
+      </p>
+      <div class="nav-mock" id="a-nav">
+        <button type="button" class="on" data-a="hub">Leaderboard hub</button>
+        <button type="button" data-a="conv-list">Conversations list</button>
+        <button type="button" data-a="conv-detail">Conversation detail</button>
+        <button type="button" data-a="log-list">Session Logs list</button>
+        <button type="button" data-a="log-detail">Session Log detail</button>
+      </div>
+    </div>
+
+    <section class="screen active" data-a-screen="hub">
+      <div class="crumb">Bench Suite · leaderboard (eval)</div>
+      <h1>Bench Suite Leaderboard</h1>
+      <p class="sub">Eval ranking stays primary. Session Review enters via two plain links (generation seam #15) — not tabs, not a third hub page.</p>
+      <div class="hub-links">
+        <button type="button" class="hub-card" data-a-goto="conv-list">
+          <h2>Antigravity Conversations →</h2>
+          <p class="sub" style="margin:0">Browse brain conversations + transcripts. Outcome prefers linked Session Log Results/Outcomes.</p>
+        </button>
+        <button type="button" class="hub-card" data-a-goto="log-list">
+          <h2>Session Logs →</h2>
+          <p class="sub" style="margin:0">Markdown notes under session-logs root. Cross-link when Conversation id / brain path matches.</p>
+        </button>
+      </div>
+      <p class="sub">Run Review remains under <code>review/</code> (out of scope here). Charts + model table omitted in this mock.</p>
+      <div class="state-dump" id="a-state-hub">view=hub · sections=conversations|session-logs</div>
+    </section>
+
+    <section class="screen" data-a-screen="conv-list">
+      <div class="crumb">
+        <a class="fake" data-a-goto="hub">Leaderboard</a> / Antigravity Conversations
+      </div>
+      <h1>Antigravity Conversations</h1>
+      <p class="sub">Date descending. Full table, no filters v1. Clickable Date / Title headers (mock). Binary match via Linked logs column.</p>
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable">Date</th>
+            <th class="sortable">Title / preview</th>
+            <th>Conversation id</th>
+            <th>Linked logs</th>
+            <th>Outcome snippet</th>
+            <th>Artifacts</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="clickable" data-a-goto="conv-detail" title="Open conversation detail">
+            <td data-value="2026-07-18">2026-07-18</td>
+            <td>Wire Session Review static generator + list columns from grilling</td>
+            <td><code title="a1b2c3d4-e5f6-7890-abcd-ef1234567890">a1b2c3d4</code></td>
+            <td><span class="chip linked">2 logs</span></td>
+            <td>Generator emits sessions/ + session-logs/; index gets two links…</td>
+            <td class="badge-row">
+              <span class="chip artifact">Full transcript</span>
+              <span class="chip artifact">Walkthrough</span>
+            </td>
+          </tr>
+          <tr class="clickable" data-a-goto="conv-detail">
+            <td data-value="2026-07-12">2026-07-12</td>
+            <td>Explore brain folder layout for inventory research</td>
+            <td><code title="e5f67890-aaaa-bbbb-cccc-ddddeeeeffff">e5f67890</code></td>
+            <td><span class="chip unlinked">unlinked</span></td>
+            <td>—</td>
+            <td class="badge-row"><span class="chip artifact">Compact only</span></td>
+          </tr>
+          <tr>
+            <td data-value="2026-07-05">2026-07-05</td>
+            <td><span class="path-hint">a9c0e1f2 · no transcript</span></td>
+            <td><code title="a9c0e1f2-1111-2222-3333-444455556666">a9c0e1f2</code></td>
+            <td><span class="chip unlinked">unlinked</span></td>
+            <td>—</td>
+            <td class="badge-row"><span class="chip muted">empty</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="state-dump">view=conversations.list · rows=3 · default_sort=date_desc · filters=none</div>
+    </section>
+
+    <section class="screen" data-a-screen="conv-detail">
+      <div class="crumb">
+        <a class="fake" data-a-goto="hub">Leaderboard</a> /
+        <a class="fake" data-a-goto="conv-list">Antigravity Conversations</a> /
+        a1b2c3d4
+      </div>
+      <h1>Conversation <code>a1b2c3d4-e5f6-7890-abcd-ef1234567890</code></h1>
+      <div class="header-meta">
+        <span class="path-hint">2026-07-18 09:12 → 14:40</span>
+        <span class="chip artifact">Full transcript</span>
+        <span class="chip artifact">Walkthrough</span>
+        <span class="chip artifact">Task</span>
+      </div>
+
+      <div class="outcome-band">
+        <div class="label">Outcome · from linked Session Log</div>
+        <p style="margin:0 0 0.35rem"><strong>Session Review generator shipped offline</strong>
+          · <a class="fake" data-a-goto="log-detail">2026-07-18 Session Log: Session Review UX</a></p>
+        <p style="margin:0;font-size:0.92rem">Generator emits <code>sessions/</code> + <code>session-logs/</code>; leaderboard index gets two links only. List columns and detail layout match locked grilling.</p>
+      </div>
+
+      <h2>Linked Session Logs</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Title</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2026-07-18</td>
+            <td>Session Log: Session Review UX</td>
+            <td><a class="fake" data-a-goto="log-detail">Open log</a></td>
+          </tr>
+          <tr>
+            <td>2026-07-18</td>
+            <td>Session Log: Follow-up notes (same Conversation id)</td>
+            <td><a class="fake">Open log</a></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>User request(s)</h2>
+      <div class="step user">
+        <div class="who">USER_EXPLICIT</div>
+        Wire Session Review static generator + list columns from grilling. Prefer Outcomes from session logs.
+      </div>
+      <div class="step user">
+        <div class="who">USER_INPUT</div>
+        Also surface walkthrough/task/plan when present; no synthetic Outcome on the list.
+      </div>
+
+      <h2>What the agent did</h2>
+      <p class="sub">Summarized step trail (default). SYSTEM noise collapsed. Full raw trail in details.</p>
+      <div class="step user"><div class="who">User</div>Wire Session Review static generator…</div>
+      <div class="step planner"><div class="who">Planner</div>Scan brain roots → match logs → emit list HTML + detail pages…</div>
+      <div class="step tool"><div class="who">Tool · read_file</div><code>CONTEXT.md</code> · glossary Session Review terms</div>
+      <div class="step tool"><div class="who">Tool · write</div><code>session_review.py</code> · generator scaffold</div>
+      <div class="step planner"><div class="who">Planner</div>Done — offline CLI path documented.</div>
+
+      <details class="raw">
+        <summary>Full transcript (raw steps)</summary>
+        <pre class="block">[09:12] SYSTEM CONVERSATION_HISTORY … (omitted in summary)
+[09:12] USER_EXPLICIT Wire Session Review static generator…
+[09:13] MODEL planner Scan brain roots…
+[09:14] TOOL read_file path=CONTEXT.md
+[09:14] TOOL_RESULT ok 4.2k
+[09:20] TOOL write path=session_review.py
+…</pre>
+      </details>
+
+      <h2>Brain sidecars</h2>
+      <details class="raw" open>
+        <summary>walkthrough.md</summary>
+        <div class="md-body" style="border:0;padding:0.5rem 0 0">
+          <p>Built list + detail HTML offline. Cross-links only on strong signals.</p>
+        </div>
+      </details>
+      <details class="raw">
+        <summary>task.md</summary>
+        <div class="md-body" style="border:0;padding:0.5rem 0 0"><p>Implement SessionReviewGenerator + CLI.</p></div>
+      </details>
+      <details class="raw">
+        <summary>implementation_plan.md</summary>
+        <div class="md-body" style="border:0;padding:0.5rem 0 0"><p>1. Config block 2. Scan 3. Match 4. Render</p></div>
+      </details>
+
+      <div class="state-dump">view=conversations.detail · id=a1b2c3d4… · linked_logs=2 · outcome=from_log · trail=summarized</div>
+    </section>
+
+    <section class="screen" data-a-screen="log-list">
+      <div class="crumb">
+        <a class="fake" data-a-goto="hub">Leaderboard</a> / Session Logs
+      </div>
+      <h1>Session Logs</h1>
+      <p class="sub">Date descending. Path hint when not at root. Binary Linked / Unlinked.</p>
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable">Date</th>
+            <th class="sortable">Title</th>
+            <th>Label</th>
+            <th>Link status</th>
+            <th>Outcome snippet</th>
+            <th>Path hint</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="clickable" data-a-goto="log-detail">
+            <td>2026-07-18</td>
+            <td>Session Review UX</td>
+            <td>session-review</td>
+            <td><span class="chip linked">Linked</span> <a class="fake" data-a-goto="conv-detail"><code>a1b2c3d4</code></a></td>
+            <td>Generator emits sessions/ + session-logs/; index gets two links…</td>
+            <td class="path-hint">—</td>
+          </tr>
+          <tr class="clickable" data-a-goto="log-detail">
+            <td>2026-07-18</td>
+            <td>Follow-up notes (same Conversation id)</td>
+            <td>—</td>
+            <td><span class="chip linked">Linked</span> <a class="fake" data-a-goto="conv-detail"><code>a1b2c3d4</code></a></td>
+            <td>Second log for multi-log → one conversation case…</td>
+            <td class="path-hint">—</td>
+          </tr>
+          <tr>
+            <td>2026-07-10</td>
+            <td>Orphan brainstorm — privacy gitignore</td>
+            <td>privacy</td>
+            <td><span class="chip unlinked">Unlinked</span></td>
+            <td>Decide redaction policy before committing HTML…</td>
+            <td class="path-hint">multi-project/</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="state-dump">view=session-logs.list · rows=3 · default_sort=date_desc · filters=none</div>
+    </section>
+
+    <section class="screen" data-a-screen="log-detail">
+      <div class="crumb">
+        <a class="fake" data-a-goto="hub">Leaderboard</a> /
+        <a class="fake" data-a-goto="log-list">Session Logs</a> /
+        Session Review UX
+      </div>
+      <h1>Session Log: Session Review UX</h1>
+      <div class="header-meta">
+        <span class="path-hint">2026-07-18 · Label: session-review · path: root</span>
+        <span class="chip linked">Linked</span>
+        <a class="fake" data-a-goto="conv-detail">Conversation <code>a1b2c3d4…</code></a>
+      </div>
+
+      <div class="outcome-band">
+        <div class="label">Outcomes (promoted)</div>
+        <p style="margin:0">Generator emits <code>sessions/</code> + <code>session-logs/</code>; leaderboard index gets two links only. List columns and detail layout match locked grilling. No synthetic Outcome when unlinked.</p>
+      </div>
+
+      <div class="md-body">
+        <h2>Session Metadata</h2>
+        <ul>
+          <li><strong>Date/Time:</strong> 2026-07-18</li>
+          <li><strong>Label:</strong> session-review</li>
+          <li><strong>Conversation ID:</strong> a1b2c3d4-e5f6-7890-abcd-ef1234567890</li>
+        </ul>
+        <h2>Actions</h2>
+        <ul>
+          <li>Locked list (#13) and detail (#14) surfaces via grilling</li>
+          <li>Prototyped multi-page static mock for operator review</li>
+          <li>Documented generation seam (#15) output layout</li>
+        </ul>
+        <p class="path-hint"><em>Results/Outcomes section omitted here — already promoted above (no duplicate).</em></p>
+      </div>
+
+      <p style="margin-top:1rem">
+        <a class="fake" data-a-goto="conv-detail">Open Antigravity Conversation →</a>
+      </p>
+
+      <details class="raw">
+        <summary>Raw Markdown source</summary>
+        <pre class="block"># Session Log: Session Review UX
+**Label:** session-review
+**Conversation ID:** a1b2c3d4-…
+
+## Outcomes
+Generator emits sessions/ + session-logs/ …
+
+## Actions
+- Locked list…</pre>
+      </details>
+      <div class="state-dump">view=session-logs.detail · slug=session-review-ux · linked=true · outcome=promoted · body_deduped=true</div>
+    </section>
+  </div>
+
+  <!-- ===================== VARIANT B: master-detail split ===================== -->
+  <div id="variant-B" class="variant" hidden>
+    <div class="vB-shell">
+      <aside class="vB-side">
+        <div class="vB-tabs">
+          <button type="button" class="on" data-b-tab="conv">Conversations</button>
+          <button type="button" data-b-tab="log">Session Logs</button>
+        </div>
+        <div class="vB-list" id="b-list-conv">
+          <button type="button" class="vB-row on" data-b="conv-linked">
+            <strong>Wire Session Review static generator…</strong>
+            <small>2026-07-18 · a1b2c3d4 · <span class="chip linked">2 logs</span></small>
+          </button>
+          <button type="button" class="vB-row" data-b="conv-orphan">
+            <strong>Explore brain folder layout…</strong>
+            <small>2026-07-12 · e5f67890 · <span class="chip unlinked">unlinked</span></small>
+          </button>
+          <button type="button" class="vB-row" data-b="conv-empty">
+            <strong>a9c0e1f2 · no transcript</strong>
+            <small>2026-07-05 · <span class="chip muted">empty</span></small>
+          </button>
+        </div>
+        <div class="vB-list" id="b-list-log" hidden>
+          <button type="button" class="vB-row" data-b="log-linked">
+            <strong>Session Review UX</strong>
+            <small>2026-07-18 · session-review · <span class="chip linked">Linked a1b2c3d4</span></small>
+          </button>
+          <button type="button" class="vB-row" data-b="log-orphan">
+            <strong>Orphan brainstorm — privacy gitignore</strong>
+            <small>2026-07-10 · multi-project/ · <span class="chip unlinked">Unlinked</span></small>
+          </button>
+        </div>
+        <p style="padding:0.75rem;margin:0;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--line)">
+          Single page, tabbed lists + detail pane. Same columns densified into rows; no multipage HTML files.
+        </p>
+      </aside>
+      <main class="vB-main" id="b-main"></main>
+    </div>
+  </div>
+
+  <!-- ===================== VARIANT C: pair-centric ===================== -->
+  <div id="variant-C" class="variant" hidden>
+    <div class="vC-wrap">
+      <div class="crumb"><a href="#">Leaderboard</a> / Session Review (pairs)</div>
+      <h1>Session Review · linked pairs first</h1>
+      <p class="sub">
+        <strong>C — Pair-centric</strong>. Primary unit is a matched conversation ↔ log.
+        Orphans live in side stacks. Challenges the “two equal top-level sections” model from the map.
+      </p>
+
+      <h2>Linked pairs</h2>
+      <button type="button" class="vC-pair on" data-c="pair">
+        <div class="vC-half">
+          <div class="k">Antigravity Conversation</div>
+          <strong>Wire Session Review static generator…</strong>
+          <div class="path-hint"><code>a1b2c3d4</code> · 2026-07-18 · Full transcript + Walkthrough</div>
+        </div>
+        <div class="vC-half">
+          <div class="k">Session Log (+1 more)</div>
+          <strong>Session Review UX</strong>
+          <div class="path-hint">Label session-review · Outcome: Generator emits sessions/…</div>
+        </div>
+      </button>
+
+      <h2>Orphans</h2>
+      <div class="vC-orphan-grid">
+        <div class="vC-stack">
+          <h3>Conversations without logs</h3>
+          <button type="button" class="item" data-c="conv-orphan">
+            <strong>Explore brain folder layout…</strong><br>
+            <small class="path-hint">e5f67890 · Outcome unavailable</small>
+          </button>
+          <button type="button" class="item" data-c="conv-empty">
+            <strong>a9c0e1f2 · no transcript</strong><br>
+            <small class="path-hint">empty brain dir</small>
+          </button>
+        </div>
+        <div class="vC-stack">
+          <h3>Logs without conversation</h3>
+          <button type="button" class="item" data-c="log-orphan">
+            <strong>Orphan brainstorm — privacy gitignore</strong><br>
+            <small class="path-hint">multi-project/ · has Outcomes text</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="vC-detail" id="c-detail"></div>
+    </div>
+  </div>
+
+  <div class="switcher" role="toolbar" aria-label="Prototype variant switcher">
+    <button type="button" id="prev" aria-label="Previous variant">←</button>
+    <div class="label" id="switcher-label">A — Multi-page section drill-down</div>
+    <button type="button" id="next" aria-label="Next variant">→</button>
+  </div>
+
+  <script>
+    /* Fixture HTML fragments reused by B + C */
+    const FIX = {
+      convLinked: `
+        <div class="crumb">Antigravity Conversations / a1b2c3d4</div>
+        <h1>Conversation <code>a1b2c3d4-e5f6-7890-abcd-ef1234567890</code></h1>
+        <div class="header-meta">
+          <span class="path-hint">2026-07-18 09:12 → 14:40</span>
+          <span class="chip artifact">Full transcript</span>
+          <span class="chip artifact">Walkthrough</span>
+        </div>
+        <div class="outcome-band">
+          <div class="label">Outcome · from linked Session Log</div>
+          <p style="margin:0"><strong>Session Review generator shipped offline.</strong>
+          Generator emits sessions/ + session-logs/; index gets two links only.</p>
+        </div>
+        <h2>Linked Session Logs</h2>
+        <table><tr><td>2026-07-18</td><td>Session Review UX</td><td><span class="chip linked">linked</span></td></tr>
+        <tr><td>2026-07-18</td><td>Follow-up notes</td><td><span class="chip linked">linked</span></td></tr></table>
+        <h2>User request(s)</h2>
+        <div class="step user"><div class="who">USER_EXPLICIT</div>Wire Session Review static generator + list columns from grilling.</div>
+        <h2>What the agent did</h2>
+        <div class="step planner"><div class="who">Planner</div>Scan → match → emit list + detail HTML</div>
+        <div class="step tool"><div class="who">Tool · write</div><code>session_review.py</code></div>
+        <details class="raw"><summary>Full transcript (raw steps)</summary><pre class="block">…raw steps…</pre></details>
+        <div class="state-dump">unit=conversation · id=a1b2c3d4 · linked_logs=2 · outcome=from_log</div>
+      `,
+      convOrphan: `
+        <div class="crumb">Antigravity Conversations / e5f67890</div>
+        <h1>Conversation <code>e5f67890-aaaa-bbbb-cccc-ddddeeeeffff</code></h1>
+        <div class="header-meta">
+          <span class="path-hint">2026-07-12</span>
+          <span class="chip artifact">Compact only</span>
+          <span class="chip unlinked">unlinked</span>
+        </div>
+        <div class="outcome-band missing">
+          <div class="label">Outcome unavailable</div>
+          <p style="margin:0">No linked Session Log — Outcome unavailable (no synthetic fallback; stays fog).</p>
+        </div>
+        <h2>Linked Session Logs</h2>
+        <p class="sub">None — unlinked state.</p>
+        <h2>User request(s)</h2>
+        <div class="step user"><div class="who">USER_EXPLICIT</div>Explore brain folder layout for inventory research</div>
+        <h2>What the agent did</h2>
+        <div class="step tool"><div class="who">Tool · bash</div>find ~/.gemini/antigravity/brain -maxdepth 2</div>
+        <div class="state-dump">unit=conversation · id=e5f67890 · linked_logs=0 · outcome=unavailable</div>
+      `,
+      convEmpty: `
+        <div class="crumb">Antigravity Conversations / a9c0e1f2</div>
+        <h1>Conversation <code>a9c0e1f2-1111-2222-3333-444455556666</code></h1>
+        <div class="header-meta"><span class="chip muted">empty</span> <span class="chip unlinked">unlinked</span></div>
+        <div class="outcome-band missing">
+          <div class="label">Outcome unavailable</div>
+          <p style="margin:0">No transcript, no linked Session Log.</p>
+        </div>
+        <p class="sub">Brain dir present; no <code>transcript_full.jsonl</code>, no walkthrough/task/plan.</p>
+        <div class="state-dump">unit=conversation · id=a9c0e1f2 · artifacts=none</div>
+      `,
+      logLinked: `
+        <div class="crumb">Session Logs / Session Review UX</div>
+        <h1>Session Log: Session Review UX</h1>
+        <div class="header-meta">
+          <span class="path-hint">2026-07-18 · Label: session-review</span>
+          <span class="chip linked">Linked</span> → <code>a1b2c3d4…</code>
+        </div>
+        <div class="outcome-band">
+          <div class="label">Outcomes (promoted)</div>
+          <p style="margin:0">Generator emits sessions/ + session-logs/; leaderboard index gets two links only.</p>
+        </div>
+        <div class="md-body">
+          <h2>Session Metadata</h2>
+          <ul><li>Conversation ID: a1b2c3d4-…</li></ul>
+          <h2>Actions</h2>
+          <ul><li>Locked list + detail surfaces</li><li>Prototyped static mock</li></ul>
+          <p class="path-hint"><em>Outcomes section omitted from body (promoted above).</em></p>
+        </div>
+        <p><a class="fake">Open Antigravity Conversation →</a></p>
+        <div class="state-dump">unit=session-log · slug=session-review-ux · linked=true</div>
+      `,
+      logOrphan: `
+        <div class="crumb">Session Logs / multi-project/ · Orphan brainstorm</div>
+        <h1>Session Log: Orphan brainstorm — privacy gitignore</h1>
+        <div class="header-meta">
+          <span class="path-hint">2026-07-10 · Label: privacy · multi-project/</span>
+          <span class="chip unlinked">Unlinked</span>
+        </div>
+        <div class="outcome-band">
+          <div class="label">Outcomes (promoted)</div>
+          <p style="margin:0">Decide redaction policy before committing HTML that embeds local transcripts.</p>
+        </div>
+        <div class="md-body">
+          <h2>Actions</h2>
+          <ul><li>Sketched gitignore options for generated Session Review HTML</li></ul>
+        </div>
+        <p class="sub">No linked conversation.</p>
+        <div class="state-dump">unit=session-log · slug=multi-project__orphan-brainstorm · linked=false</div>
+      `,
+      pairDual: `
+        <h2 style="margin-top:0">Pair detail</h2>
+        <p class="sub">Both sides of the match on one surface — Outcome still prefers the log.</p>
+        <div class="vC-dual">
+          <div>
+            <div class="k" style="font-size:0.68rem;text-transform:uppercase;color:var(--muted);font-weight:700">Conversation a1b2c3d4</div>
+            <p><strong>Wire Session Review static generator…</strong></p>
+            <div class="step user"><div class="who">User</div>Wire Session Review…</div>
+            <div class="step tool"><div class="who">Tool</div>write session_review.py</div>
+          </div>
+          <div>
+            <div class="k" style="font-size:0.68rem;text-transform:uppercase;color:var(--muted);font-weight:700">Session Log</div>
+            <div class="outcome-band" style="margin-top:0.5rem">
+              <div class="label">Outcomes</div>
+              <p style="margin:0">Generator emits sessions/ + session-logs/; index gets two links only.</p>
+            </div>
+            <p class="path-hint">+ 1 more linked log (Follow-up notes)</p>
+          </div>
+        </div>
+        <div class="state-dump">unit=pair · conversation=a1b2c3d4 · logs=2 · primary_affordance=joint_detail</div>
+      `,
+    };
+
+    const VARIANTS = [
+      { key: 'A', name: 'Multi-page section drill-down' },
+      { key: 'B', name: 'Master-detail split' },
+      { key: 'C', name: 'Pair-centric inbox' },
+    ];
+
+    function setVariant(key) {
+      const k = (key || 'A').toUpperCase();
+      const meta = VARIANTS.find(v => v.key === k) || VARIANTS[0];
+      VARIANTS.forEach(v => {
+        const el = document.getElementById('variant-' + v.key);
+        if (el) el.hidden = v.key !== meta.key;
+      });
+      document.getElementById('switcher-label').innerHTML =
+        meta.key + ' — ' + meta.name + '<small>?variant=' + meta.key + '</small>';
+      const url = new URL(location.href);
+      url.searchParams.set('variant', meta.key);
+      history.replaceState(null, '', url);
+      if (meta.key === 'B') showB(document.querySelector('.vB-row.on')?.dataset.b || 'conv-linked');
+      if (meta.key === 'C') showC(document.querySelector('.vC-pair.on, .vC-stack .item.on')?.dataset.c || 'pair');
+      dumpGlobal(meta.key);
+    }
+
+    function dumpGlobal(key) {
+      /* surface active state for the prototype rule */
+      console.info('[prototype-session-review]', { variant: key, href: location.href });
+    }
+
+    function cycle(delta) {
+      const cur = (new URL(location.href)).searchParams.get('variant') || 'A';
+      const i = Math.max(0, VARIANTS.findIndex(v => v.key === cur.toUpperCase()));
+      const next = VARIANTS[(i + delta + VARIANTS.length) % VARIANTS.length];
+      setVariant(next.key);
+    }
+
+    document.getElementById('prev').onclick = () => cycle(-1);
+    document.getElementById('next').onclick = () => cycle(1);
+    document.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === 'ArrowLeft') cycle(-1);
+      if (e.key === 'ArrowRight') cycle(1);
+    });
+
+    /* Variant A screen nav */
+    function showA(id) {
+      document.querySelectorAll('#a-nav button').forEach(b => b.classList.toggle('on', b.dataset.a === id));
+      document.querySelectorAll('#variant-A .screen').forEach(s => {
+        s.classList.toggle('active', s.dataset.aScreen === id);
+      });
+      console.info('[prototype-session-review]', { variant: 'A', screen: id });
+    }
+    document.querySelectorAll('#a-nav button').forEach(btn => {
+      btn.addEventListener('click', () => showA(btn.dataset.a));
+    });
+    document.querySelectorAll('[data-a-goto]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        showA(el.dataset.aGoto);
+      });
+    });
+
+    /* Variant B */
+    function showB(which) {
+      document.querySelectorAll('.vB-row').forEach(el => {
+        el.classList.toggle('on', el.dataset.b === which);
+      });
+      const isLog = which.startsWith('log');
+      document.querySelectorAll('.vB-tabs button').forEach(b => {
+        b.classList.toggle('on', (isLog && b.dataset.bTab === 'log') || (!isLog && b.dataset.bTab === 'conv'));
+      });
+      document.getElementById('b-list-conv').hidden = isLog;
+      document.getElementById('b-list-log').hidden = !isLog;
+      const map = {
+        'conv-linked': FIX.convLinked,
+        'conv-orphan': FIX.convOrphan,
+        'conv-empty': FIX.convEmpty,
+        'log-linked': FIX.logLinked,
+        'log-orphan': FIX.logOrphan,
+      };
+      document.getElementById('b-main').innerHTML = map[which] || FIX.convLinked;
+      console.info('[prototype-session-review]', { variant: 'B', unit: which });
+    }
+    document.querySelectorAll('.vB-tabs button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.bTab;
+        showB(tab === 'log' ? 'log-linked' : 'conv-linked');
+      });
+    });
+    document.querySelectorAll('.vB-row').forEach(el => {
+      el.addEventListener('click', () => showB(el.dataset.b));
+    });
+
+    /* Variant C */
+    function showC(which) {
+      document.querySelectorAll('.vC-pair, .vC-stack .item').forEach(el => {
+        el.classList.toggle('on', el.dataset.c === which);
+      });
+      const map = {
+        pair: FIX.pairDual,
+        'conv-orphan': FIX.convOrphan,
+        'conv-empty': FIX.convEmpty,
+        'log-orphan': FIX.logOrphan,
+      };
+      document.getElementById('c-detail').innerHTML = map[which] || FIX.pairDual;
+      console.info('[prototype-session-review]', { variant: 'C', unit: which });
+    }
+    document.querySelectorAll('.vC-pair, .vC-stack .item').forEach(el => {
+      el.addEventListener('click', () => showC(el.dataset.c));
+    });
+
+    setVariant(new URL(location.href).searchParams.get('variant') || 'A');
+  </script>
+</body>
+</html>
