@@ -193,6 +193,10 @@ def test_writes_leaderboard_and_html(tmp_path: Path) -> None:
     assert "successChart" in html_text
     assert "latest per task × model" in html_text
     assert "data-col=" in html_text
+    assert 'href="sessions/index.html"' in html_text
+    assert 'href="session-logs/index.html"' in html_text
+    assert "Antigravity Conversations" in html_text
+    assert "Session Logs" in html_text
     # Multi-page review surface
     review = tmp_path / "review"
     assert (review / "tasks" / "offline_golden_01.html").is_file()

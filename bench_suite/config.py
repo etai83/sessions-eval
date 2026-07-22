@@ -49,6 +49,26 @@ DEFAULT_RUN_REVIEW_CAPS: dict[str, int] = {
 # Soft size caps for Run Review Pack write only (evaluation still sees full data).
 DEFAULT_CONFIG["run_review_caps"] = dict(DEFAULT_RUN_REVIEW_CAPS)
 
+# Session Review: source roots + output layout + soft size caps for static HTML (#15/#16).
+DEFAULT_SESSION_REVIEW_CAPS: dict[str, int] = {
+    "max_steps": 200,
+    "max_transcript_bytes": 524_288,
+    "max_sidecar_bytes": 65_536,
+}
+
+DEFAULT_SESSION_REVIEW: dict[str, Any] = {
+    "antigravity_brain": "~/.gemini/antigravity/brain",
+    "antigravity_ide_brain": "~/.gemini/antigravity-ide/brain",
+    "session_logs": "~/Documents/session-logs",
+    "output": {
+        "sessions_root": ".scratch/bench-suite/sessions",
+        "session_logs_root": ".scratch/bench-suite/session-logs",
+    },
+    "caps": dict(DEFAULT_SESSION_REVIEW_CAPS),
+}
+
+DEFAULT_CONFIG["session_review"] = json.loads(json.dumps(DEFAULT_SESSION_REVIEW))
+
 
 def resolve_run_review_caps(
     config: dict[str, Any] | None = None,
@@ -83,6 +103,56 @@ def resolve_run_review_caps(
     return base  # type: ignore[return-value]
 
 
+def resolve_session_review_caps(
+    config: dict[str, Any] | None = None,
+    *,
+    overrides: dict[str, int | None] | None = None,
+    caps_off: bool = False,
+) -> dict[str, int | None]:
+    """
+    Effective Session Review soft-cap map (generate-time HTML only).
+
+    Missing config keys fall back to defaults. ``caps_off`` forces all three to
+    ``null`` (no truncation). ``overrides`` replace individual keys; ``None``
+    disables that axis.
+    """
+    if caps_off:
+        return {
+            "max_steps": None,
+            "max_transcript_bytes": None,
+            "max_sidecar_bytes": None,
+        }
+    base: dict[str, int | None] = dict(DEFAULT_SESSION_REVIEW_CAPS)
+    if config:
+        sr = config.get("session_review") or {}
+        raw = sr.get("caps") if isinstance(sr, dict) else None
+        if not isinstance(raw, dict):
+            raw = config.get("session_review_caps") or {}
+        for key in DEFAULT_SESSION_REVIEW_CAPS:
+            if key in raw and raw[key] is not None:
+                base[key] = int(raw[key])
+    if overrides:
+        for key, value in overrides.items():
+            if key not in DEFAULT_SESSION_REVIEW_CAPS:
+                raise ValueError(f"Unknown session review cap: {key}")
+            base[key] = value if value is None else int(value)
+    return base
+
+
+def parse_cap_overrides(items: list[str] | None, *, flag: str = "--session-cap") -> dict[str, int]:
+    """Parse repeatable ``KEY=VALUE`` CLI items into int overrides."""
+    out: dict[str, int] = {}
+    for item in items or []:
+        if "=" not in item:
+            raise ValueError(f"Invalid {flag} (expected key=value): {item!r}")
+        key, raw = item.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"Invalid {flag} (empty key): {item!r}")
+        out[key] = int(raw.strip())
+    return out
+
+
 def load_config(path: Path | None = None, *, repo_root: Path | None = None) -> dict[str, Any]:
     """Load config JSON and merge onto defaults. Paths are resolved against repo_root."""
     root = (repo_root or Path.cwd()).resolve()
@@ -97,7 +167,39 @@ def load_config(path: Path | None = None, *, repo_root: Path | None = None) -> d
         key: str((root / rel).resolve()) if not Path(rel).is_absolute() else rel
         for key, rel in merged["paths"].items()
     }
+    merged["_resolved_session_review"] = _resolve_session_review_paths(
+        merged.get("session_review") or {},
+        repo_root=root,
+    )
     return merged
+
+
+def _expand_user_path(value: str, *, repo_root: Path) -> str:
+    """Expand ``~`` and resolve relative paths against repo_root."""
+    p = Path(value).expanduser()
+    if not p.is_absolute():
+        p = (repo_root / p).resolve()
+    else:
+        p = p.resolve()
+    return str(p)
+
+
+def _resolve_session_review_paths(
+    session_review: dict[str, Any],
+    *,
+    repo_root: Path,
+) -> dict[str, str]:
+    """Absolute paths for session_review source roots and HTML output roots."""
+    out: dict[str, str] = {}
+    for key in ("antigravity_brain", "antigravity_ide_brain", "session_logs"):
+        if key in session_review and session_review[key] is not None:
+            out[key] = _expand_user_path(str(session_review[key]), repo_root=repo_root)
+    output = session_review.get("output") or {}
+    if isinstance(output, dict):
+        for key in ("sessions_root", "session_logs_root"):
+            if key in output and output[key] is not None:
+                out[key] = _expand_user_path(str(output[key]), repo_root=repo_root)
+    return out
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> None:

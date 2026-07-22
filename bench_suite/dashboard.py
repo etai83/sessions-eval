@@ -149,6 +149,9 @@ def render_leaderboard_md(rows: list[dict[str, Any]]) -> str:
     lines = [
         "# Leaderboard",
         "",
+        "Session Review: [Antigravity Conversations](sessions/index.html) · "
+        "[Session Logs](session-logs/index.html)",
+        "",
         "| Rank | Model | Config | Avg Success | Total Cost | Total ROI | Cost-Eff (ROI/$) |",
         "|------|-------|--------|-------------|------------|-----------|------------------|",
     ]
@@ -250,6 +253,11 @@ def render_index_html(
 <body>
   <h1>Bench Suite Leaderboard</h1>
   <p>Ranked by average success rate, then cost-effectiveness (ROI/$). Latest run per task × model only. Click column headers to sort. Model names open run review.</p>
+  <p class="session-nav">
+    <a href="sessions/index.html">Antigravity Conversations</a>
+    ·
+    <a href="session-logs/index.html">Session Logs</a>
+  </p>
   <div class="charts">
     <div><canvas id="successChart"></canvas></div>
     <div><canvas id="scatterChart"></canvas></div>

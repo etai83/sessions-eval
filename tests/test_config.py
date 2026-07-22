@@ -16,6 +16,12 @@ def test_defaults_include_open_question_resolutions() -> None:
     assert DEFAULT_CONFIG["paths"]["runs"] == ".scratch/bench-suite/runs"
     assert DEFAULT_CONFIG["paths"]["dataset_results"] == ".scratch/bench-suite/dataset/results"
     assert DEFAULT_CONFIG["run_review_caps"]["max_files"] == 100
+    assert DEFAULT_CONFIG["session_review"]["caps"]["max_steps"] == 200
+    assert DEFAULT_CONFIG["session_review"]["caps"]["max_transcript_bytes"] == 524_288
+    assert DEFAULT_CONFIG["session_review"]["caps"]["max_sidecar_bytes"] == 65_536
+    assert DEFAULT_CONFIG["session_review"]["output"]["sessions_root"] == (
+        ".scratch/bench-suite/sessions"
+    )
 
 
 def test_load_config_resolves_paths(tmp_suite: Path) -> None:

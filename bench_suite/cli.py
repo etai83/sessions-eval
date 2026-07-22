@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from bench_suite.config import parse_cap_overrides
 from bench_suite.live import run_live_task
 from bench_suite.offline import run_offline_golden_path
 from bench_suite.runner import AlreadyEvaluatedError
@@ -21,16 +22,12 @@ from bench_suite.pipeline import (
 
 def _parse_review_caps(items: list[str] | None) -> dict[str, int]:
     """Parse repeatable ``--review-cap key=value`` into a dict of int overrides."""
-    out: dict[str, int] = {}
-    for item in items or []:
-        if "=" not in item:
-            raise ValueError(f"Invalid --review-cap (expected key=value): {item!r}")
-        key, raw = item.split("=", 1)
-        key = key.strip()
-        if not key:
-            raise ValueError(f"Invalid --review-cap (empty key): {item!r}")
-        out[key] = int(raw.strip())
-    return out
+    return parse_cap_overrides(items, flag="--review-cap")
+
+
+def _parse_session_caps(items: list[str] | None) -> dict[str, int]:
+    """Parse repeatable ``--session-cap key=value`` (for generate-session-review)."""
+    return parse_cap_overrides(items, flag="--session-cap")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -162,6 +159,45 @@ def main(argv: list[str] | None = None) -> int:
         "--review-caps-off",
         action="store_true",
         help="Disable all Run Review Pack soft size caps for this invocation",
+    )
+
+    session_review = sub.add_parser(
+        "generate-session-review",
+        help=(
+            "Regenerate Session Review static HTML (Antigravity Conversations + "
+            "Session Logs) from configured local roots"
+        ),
+    )
+    session_review.add_argument("--repo-root", type=Path, default=None)
+    session_review.add_argument(
+        "--brain",
+        type=Path,
+        default=None,
+        help="Override antigravity brain root (default: session_review.antigravity_brain)",
+    )
+    session_review.add_argument(
+        "--ide-brain",
+        type=Path,
+        default=None,
+        help="Override antigravity-ide brain root",
+    )
+    session_review.add_argument(
+        "--session-logs",
+        type=Path,
+        default=None,
+        help="Override session-logs root",
+    )
+    session_review.add_argument(
+        "--session-cap",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Override a session_review.caps key for this invocation (repeatable)",
+    )
+    session_review.add_argument(
+        "--session-caps-off",
+        action="store_true",
+        help="Disable all Session Review soft size caps for this invocation",
     )
 
     refresh = sub.add_parser(
@@ -312,6 +348,31 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1 if result["failed"] else 0
+
+    if args.command == "generate-session-review":
+        from bench_suite.session_review import generate_session_review
+
+        try:
+            cap_overrides = _parse_session_caps(args.session_cap) or None
+            result = generate_session_review(
+                repo_root=args.repo_root,
+                antigravity_brain=args.brain,
+                antigravity_ide_brain=args.ide_brain,
+                session_logs=args.session_logs,
+                caps_overrides=cap_overrides,
+                caps_off=bool(args.session_caps_off),
+            )
+        except (ValueError, OSError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(json.dumps(result, indent=2))
+        print(
+            f"\nSession Review generated: conversations={result['conversations']} "
+            f"logs={result['session_logs']} linked={result['linked_logs']} "
+            f"sessions={result['sessions_out']}",
+            file=sys.stderr,
+        )
+        return 0
 
     if args.command == "refresh":
         if not args.transcripts and not args.transcripts_root:
