@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { db, sqlite } from '../db';
 import { sessions, toolCalls } from '../db/schema';
+import { classifyConversation, classifyRequestCategory } from './task_classifier';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MODEL_SETTING_RE = /The user changed setting `?Model Selection`? from .*? to (.*?)(?:\s*\((High|Medium|Low|Thinking)\))?\s*\.\s*(?:No need|<\/USER_SETTINGS_CHANGE>|$)/i;
@@ -140,6 +141,8 @@ export function runIndexer(options: { force?: boolean } = {}): { conversationsIn
       model_initial = excluded.model_initial,
       model_last = excluded.model_last,
       thinking_level = excluded.thinking_level,
+      task_type = excluded.task_type,
+      request_category = excluded.request_category,
       total_steps = excluded.total_steps,
       user_request_count = excluded.user_request_count,
       date_start = excluded.date_start,
@@ -176,9 +179,9 @@ export function runIndexer(options: { force?: boolean } = {}): { conversationsIn
 
       const meta = parseTranscript(targetFile);
 
-      // Default heuristic task type classifier (will be enhanced by classifier module)
-      const taskType = 'general';
-      const requestCategory = 'general';
+      // Classify task type and request category dynamically
+      const taskType = classifyConversation(meta.firstPrompt, Object.keys(meta.toolCallCounts));
+      const requestCategory = classifyRequestCategory(meta.firstPrompt);
 
       sqlite.transaction(() => {
         upsertSession.run({

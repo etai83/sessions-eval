@@ -49,5 +49,16 @@ try {
   // Column already exists, ignore error
 }
 
+// Auto-backfill classification for unclassified sessions on startup
+try {
+  const unclassified = sqlite.prepare(`SELECT COUNT(*) as count FROM sessions WHERE request_category IS NULL`).get() as any;
+  if (unclassified && unclassified.count > 0) {
+    const { classifyAllIndexedSessions } = require('../lib/task_classifier');
+    classifyAllIndexedSessions();
+  }
+} catch {
+  // ignore
+}
+
 export const db = drizzle(sqlite, { schema });
 export { sqlite };
