@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 
 const COLORS = ['#10B981', '#F59E0B', '#6366F1', '#EC4899', '#8B5CF6', '#3B82F6', '#64748B'];
 
-export function AnalyticsHeader() {
+export function AnalyticsHeader({ refreshKey }: { refreshKey?: number }) {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
@@ -14,7 +14,7 @@ export function AnalyticsHeader() {
       .then(res => res.json())
       .then(d => setData(d))
       .catch(() => {});
-  }, []);
+  }, [refreshKey]);
 
   if (!data) return null;
 

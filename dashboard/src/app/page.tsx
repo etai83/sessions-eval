@@ -1,8 +1,18 @@
+'use client';
+
+import React, { useState } from 'react';
 import { AnalyticsHeader } from '@/components/AnalyticsHeader';
 import { SessionsTable } from '@/components/SessionsTable';
+import { SyncButton } from '@/components/SyncButton';
 import { Layers } from 'lucide-react';
 
 export default function HomePage() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleSyncComplete = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900 pb-12">
       {/* Navbar Header */}
@@ -17,13 +27,16 @@ export default function HomePage() {
               <p className="text-xs text-slate-500 mt-1">Analytics Dashboard & Log Inspector</p>
             </div>
           </div>
+
+          {/* Sync Button */}
+          <SyncButton onSyncComplete={handleSyncComplete} />
         </div>
       </header>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        <AnalyticsHeader />
-        <SessionsTable />
+        <AnalyticsHeader refreshKey={refreshKey} />
+        <SessionsTable refreshKey={refreshKey} />
       </div>
     </main>
   );

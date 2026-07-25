@@ -22,7 +22,7 @@ export interface SessionRow {
   tool_count: number;
 }
 
-export function SessionsTable() {
+export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
   const [data, setData] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -70,7 +70,7 @@ export function SessionsTable() {
 
   useEffect(() => {
     fetchSessions();
-  }, [query, model, thinking, taskType, source, page]);
+  }, [query, model, thinking, taskType, source, page, refreshKey]);
 
   const handleOverrideTaskType = async (sessionId: string, newType: string) => {
     try {
