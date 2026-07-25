@@ -3,9 +3,9 @@ import path from 'path';
 import os from 'os';
 import { db, sqlite } from '../db';
 import { sessions, toolCalls } from '../db/schema';
-import { eq } from 'drizzle-orm';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MODEL_SETTING_RE = /The user changed setting `?Model Selection`? from .*? to (.*?)(?:\s*\((High|Medium|Low|Thinking)\))?\s*\.\s*(?:No need|<\/USER_SETTINGS_CHANGE>|$)/i;
 
 export interface ExtractedMetadata {
   firstPrompt: string;
@@ -50,14 +50,16 @@ export function parseTranscript(filePath: string): ExtractedMetadata {
         const content = String(obj.content || '');
 
         // Extract settings changes (Model & Thinking level)
-        if (content.includes('USER_SETTINGS_CHANGE')) {
-          const match = content.match(/Model Selection`?\s+from\s+.*?\s+to\s+([^\n\(\.<]+)(?:\s*\((High|Medium|Low)\))?/i);
+        if (content.includes('USER_SETTINGS_CHANGE') || content.includes('Model Selection')) {
+          const match = MODEL_SETTING_RE.exec(content);
           if (match) {
             const rawModel = match[1].trim();
-            const rawThinking = match[2] || null;
-            if (!modelInitial) modelInitial = rawModel;
-            modelLast = rawModel;
-            if (rawThinking) thinkingLevel = rawThinking;
+            const rawThinking = match[2] ? match[2].trim() : null;
+            if (rawModel) {
+              if (!modelInitial) modelInitial = rawModel;
+              modelLast = rawModel;
+              if (rawThinking) thinkingLevel = rawThinking;
+            }
           }
         }
 
@@ -92,6 +94,13 @@ export function parseTranscript(filePath: string): ExtractedMetadata {
     }
   } catch {
     // Return defaults if file read fails
+  }
+
+  // Fallback default for sessions without explicit setting change tags
+  if (!modelLast) {
+    modelLast = 'Gemini 3.5 Flash';
+    modelInitial = 'Gemini 3.5 Flash';
+    thinkingLevel = 'Default';
   }
 
   return {
