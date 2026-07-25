@@ -1,0 +1,35 @@
+{
+  "default_task_type": "feature",
+  "rules": [
+    {
+      "task_type": "debug",
+      "prompt_keywords": ["debug", "fix", "error", "bug", "fail", "failing", "exception", "traceback", "issue", "broken", "investigate"],
+      "tools": ["grep_search", "view_file"]
+    },
+    {
+      "task_type": "refactor",
+      "prompt_keywords": ["refactor", "clean", "rewrite", "structure", "simplify", "decouple", "extract", "format"],
+      "tools": ["replace_file_content", "multi_replace_file_content"]
+    },
+    {
+      "task_type": "research",
+      "prompt_keywords": ["explore", "search", "explain", "how does", "what is", "where is", "research", "find", "understand", "review"],
+      "tools": ["grep_search", "view_file", "search_web"]
+    },
+    {
+      "task_type": "config",
+      "prompt_keywords": ["config", "package.json", "env", "setting", "setup", "install", "deps", "skill", "rule", "hook"],
+      "tools": ["run_command", "write_to_file"]
+    },
+    {
+      "task_type": "setup",
+      "prompt_keywords": ["init", "initialize", "bootstrap", "create project", "setup repo"],
+      "tools": ["run_command"]
+    },
+    {
+      "task_type": "feature",
+      "prompt_keywords": ["build", "create", "implement", "add", "feature", "new", "write", "generate"],
+      "tools": ["write_to_file", "replace_file_content"]
+    }
+  ]
+}
