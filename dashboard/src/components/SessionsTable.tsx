@@ -13,6 +13,7 @@ export interface SessionRow {
   thinking_level: string | null;
   task_type: string;
   task_type_override: string | null;
+  request_category: string | null;
   total_steps: number;
   user_request_count: number;
   date_start: string | null;
@@ -29,6 +30,7 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
   const [model, setModel] = useState('');
   const [thinking, setThinking] = useState('');
   const [taskType, setTaskType] = useState('');
+  const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -38,8 +40,9 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
     models: string[];
     thinkingLevels: string[];
     taskTypes: string[];
+    requestCategories: string[];
     sources: string[];
-  }>({ models: [], thinkingLevels: [], taskTypes: [], sources: [] });
+  }>({ models: [], thinkingLevels: [], taskTypes: [], requestCategories: [], sources: [] });
 
   const handleDownloadJSON = () => {
     const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
@@ -59,6 +62,7 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
         model,
         thinking,
         task_type: taskType,
+        category,
         source,
         page: String(page),
         pageSize: '15',
@@ -80,7 +84,7 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
 
   useEffect(() => {
     fetchSessions();
-  }, [query, model, thinking, taskType, source, page, refreshKey]);
+  }, [query, model, thinking, taskType, category, source, page, refreshKey]);
 
   const handleOverrideTaskType = async (sessionId: string, newType: string) => {
     try {
@@ -155,6 +159,18 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
             <option value="">All Task Types</option>
             {options.taskTypes.map(t => (
               <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+
+          {/* Topic Category Filter */}
+          <select
+            value={category}
+            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+            className="px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+          >
+            <option value="">All Topic Categories</option>
+            {(options.requestCategories || []).map(c => (
+              <option key={c} value={c}>{c}</option>
             ))}
           </select>
 
@@ -247,9 +263,16 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
                       </td>
 
                       <td className="py-3 px-4 max-w-md truncate text-xs text-slate-700" title={row.first_prompt}>
-                        <Link href={`/sessions/${row.id}`} className="hover:text-sky-600">
-                          {row.first_prompt}
-                        </Link>
+                        <div className="flex items-center gap-2 truncate">
+                          {row.request_category && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded shrink-0">
+                              {row.request_category}
+                            </span>
+                          )}
+                          <Link href={`/sessions/${row.id}`} className="hover:text-sky-600 truncate">
+                            {row.first_prompt}
+                          </Link>
+                        </div>
                       </td>
 
                       <td className="py-3 px-4 whitespace-nowrap text-center text-xs font-semibold text-slate-600">
