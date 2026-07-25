@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { AnalyticsHeader } from '@/components/AnalyticsHeader';
+import { RequestTopics } from '@/components/RequestTopics';
 import { SessionsTable } from '@/components/SessionsTable';
 import { SyncButton } from '@/components/SyncButton';
 import { Layers } from 'lucide-react';
@@ -36,6 +37,7 @@ export default function HomePage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         <AnalyticsHeader refreshKey={refreshKey} />
+        <RequestTopics refreshKey={refreshKey} />
         <SessionsTable refreshKey={refreshKey} />
       </div>
     </main>

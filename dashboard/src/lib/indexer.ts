@@ -130,10 +130,10 @@ export function runIndexer(options: { force?: boolean } = {}): { conversationsIn
   const upsertSession = sqlite.prepare(`
     INSERT INTO sessions (
       id, source_brain, first_prompt, model_initial, model_last, thinking_level,
-      task_type, total_steps, user_request_count, date_start, date_end, indexed_at
+      task_type, request_category, total_steps, user_request_count, date_start, date_end, indexed_at
     ) VALUES (
       @id, @source_brain, @first_prompt, @model_initial, @model_last, @thinking_level,
-      @task_type, @total_steps, @user_request_count, @date_start, @date_end, @indexed_at
+      @task_type, @request_category, @total_steps, @user_request_count, @date_start, @date_end, @indexed_at
     )
     ON CONFLICT(id) DO UPDATE SET
       first_prompt = excluded.first_prompt,
@@ -178,6 +178,7 @@ export function runIndexer(options: { force?: boolean } = {}): { conversationsIn
 
       // Default heuristic task type classifier (will be enhanced by classifier module)
       const taskType = 'general';
+      const requestCategory = 'general';
 
       sqlite.transaction(() => {
         upsertSession.run({
@@ -188,6 +189,7 @@ export function runIndexer(options: { force?: boolean } = {}): { conversationsIn
           model_last: meta.modelLast,
           thinking_level: meta.thinkingLevel,
           task_type: taskType,
+          request_category: requestCategory,
           total_steps: meta.totalSteps,
           user_request_count: meta.userRequestCount,
           date_start: meta.dateStart,

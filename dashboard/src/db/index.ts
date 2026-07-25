@@ -24,6 +24,7 @@ sqlite.exec(`
     thinking_level TEXT,
     task_type TEXT NOT NULL,
     task_type_override TEXT,
+    request_category TEXT,
     total_steps INTEGER NOT NULL DEFAULT 0,
     user_request_count INTEGER NOT NULL DEFAULT 0,
     date_start TEXT,
@@ -40,6 +41,13 @@ sqlite.exec(`
     call_count INTEGER NOT NULL DEFAULT 0
   );
 `);
+
+// Migration helper for adding columns to pre-existing SQLite database
+try {
+  sqlite.exec(`ALTER TABLE sessions ADD COLUMN request_category TEXT;`);
+} catch {
+  // Column already exists, ignore error
+}
 
 export const db = drizzle(sqlite, { schema });
 export { sqlite };

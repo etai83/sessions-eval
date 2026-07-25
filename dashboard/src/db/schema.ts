@@ -9,6 +9,7 @@ export const sessions = sqliteTable('sessions', {
   thinkingLevel: text('thinking_level'), // 'Low' | 'Medium' | 'High' | null
   taskType: text('task_type').notNull(), // 'feature' | 'debug' | 'refactor' | 'research' | 'config' | 'setup'
   taskTypeOverride: text('task_type_override'), // User manual override tag
+  requestCategory: text('request_category'),
   totalSteps: integer('total_steps').notNull().default(0),
   userRequestCount: integer('user_request_count').notNull().default(0),
   dateStart: text('date_start'),

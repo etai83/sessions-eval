@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Filter, RefreshCw, FileText, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, RefreshCw, FileText, CheckCircle2, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
 export interface SessionRow {
   id: string;
@@ -40,6 +40,16 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
     taskTypes: string[];
     sources: string[];
   }>({ models: [], thinkingLevels: [], taskTypes: [], sources: [] });
+
+  const handleDownloadJSON = () => {
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    downloadAnchor.setAttribute('download', `sessions_filtered_export.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -158,6 +168,16 @@ export function SessionsTable({ refreshKey }: { refreshKey?: number }) {
             <option value="cli">CLI</option>
             <option value="ide">IDE</option>
           </select>
+
+          {/* Export JSON Button */}
+          <button
+            onClick={handleDownloadJSON}
+            title="Download currently filtered sessions as JSON"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors cursor-pointer ml-auto"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export JSON</span>
+          </button>
         </div>
       </div>
 

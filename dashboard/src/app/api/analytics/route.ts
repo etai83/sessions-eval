@@ -47,6 +47,14 @@ export async function GET() {
     ORDER BY count DESC
   `).all();
 
+  // Request category breakdown
+  const requestCategoryBreakdown = sqlite.prepare(`
+    SELECT COALESCE(request_category, 'general') as category, COUNT(*) as count
+    FROM sessions
+    GROUP BY category
+    ORDER BY count DESC
+  `).all();
+
   return NextResponse.json({
     summary: {
       totalSessions,
@@ -57,6 +65,7 @@ export async function GET() {
     },
     charts: {
       taskTypes: taskTypeBreakdown,
+      requestCategories: requestCategoryBreakdown,
       topTools: topToolsData,
       models: modelDistData,
     },
