@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (category) {
-    whereClauses.push('COALESCE(request_category, "general") = ?');
+    whereClauses.push("COALESCE(request_category, 'general') = ?");
     params.push(category);
   }
 
